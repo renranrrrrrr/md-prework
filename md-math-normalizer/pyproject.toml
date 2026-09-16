@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "md-math-normalizer"
+version = "0.1.0"
+description = "Deterministic Chinese math Markdown normalizer"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+md-math-normalizer = "md_math_normalizer.cli:main"
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8",
+  "pytest-timeout>=2"
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["md_math_normalizer*"]
+
+[tool.pytest.ini_options]
+addopts = "-q --timeout=60"
+tmp_path_retention_count = 0

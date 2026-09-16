@@ -1,0 +1,4 @@
+# pdf2md 的唯一第三方依赖。
+# 只用 paddleocr-mcp 的 API 客户端层（inference/），不启动 MCP 服务、
+# 不做本地推理，因此不需要 paddlepaddle / paddleocr[doc-parser]。
+paddleocr-mcp>=0.8.5

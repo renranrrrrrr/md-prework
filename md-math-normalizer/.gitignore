@@ -1,0 +1,18 @@
+# 虚拟环境与构建产物
+.venv/
+build/
+dist/
+*.egg-info/
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.pytest_tmp/
+
+# 本地临时/探针文件
+.tmp_*/
+.pip_tmp/
+pytest-cache-files-*/
+normalizer_startup_error.txt
+数学规范化工具_启动错误.txt
