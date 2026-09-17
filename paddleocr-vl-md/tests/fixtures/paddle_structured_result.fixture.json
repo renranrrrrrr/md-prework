@@ -1,0 +1,3685 @@
+{
+  "schema_version": "md-prework/paddle-structured-result-fixture/v1",
+  "source": {
+    "tool": "paddleocr-vl-md/tools/probe_paddle_capabilities.py",
+    "model": "PaddleOCR-VL-1.6",
+    "page_ranges": "1-4",
+    "input_name": "paper-01_book-1-7_pdf-6-12.pdf",
+    "token_source": "进程环境变量 PADDLEOCR_API_KEY",
+    "mode": "live",
+    "note": "final live run: single command produced both report and fixture"
+  },
+  "note": "脱敏后的 PaddleOCR-VL structured result：键名/类型/版面字段保真，长文本截断、URL 与 base64 负载替换为占位符。",
+  "page_count": 4,
+  "envelope": {
+    "line_count": 4,
+    "line_keys": [
+      "errorCode",
+      "errorMsg",
+      "logId",
+      "result"
+    ],
+    "result_keys": [
+      "dataInfo",
+      "layoutParsingResults",
+      "preprocessedImages"
+    ],
+    "data_info_keys": [
+      "numPages",
+      "pages",
+      "type"
+    ],
+    "data_info_sample": {
+      "numPages": 1,
+      "page_size_keys": [
+        "height",
+        "width"
+      ],
+      "type": "pdf"
+    },
+    "layout_parsing_results_per_line": [
+      1,
+      1,
+      1,
+      1
+    ]
+  },
+  "pages": [
+    {
+      "position": 0,
+      "markdown_text": "# 全国高中数学联合竞赛模拟题(1)\n\n李宝毅 $ ^{1} $ 潘铁 $ ^{2} $\n\n(1. 天津师范大学数学科学学院, 300387 2. 天津市实验中学, 300074)\n\n## 第一试\n\n## 一、 填空题(每小题8分，共64分)\n\n1.  $ \\frac{\\sum_{k=1}^{2020}\\ln\\frac{k}{k+1}}{\\prod_{k=2}^{2020}\\log_{k}(k+1...<<truncated sha256:2bce2dd30d406fca chars:1778>>",
+      "markdown_images": {},
+      "output_images": {
+        "layout_det_res": "<<redacted-resource:20a9afef73c69bd0>>"
+      },
+      "pruned_result": {
+        "page_count": null,
+        "width": 2706,
+        "height": 3772,
+        "model_settings": {
+          "use_doc_preprocessor": true,
+          "use_layout_detection": true,
+          "use_chart_recognition": false,
+          "use_seal_recognition": false,
+          "use_ocr_for_image_block": false,
+          "format_block_content": false,
+          "merge_layout_blocks": true,
+          "markdown_ignore_labels": [
+            "number",
+            "footnote",
+            "header",
+            "header_image",
+            "footer",
+            "footer_image",
+            "aside_text"
+          ],
+          "return_layout_polygon_points": true
+        },
+        "parsing_res_list": [
+          {
+            "block_label": "header",
+            "block_content": "Training Tests for the 2020 National Senior High School Mathematical Competition",
+            "block_bbox": [
+              10,
+              1,
+              1659,
+              97
+            ],
+            "block_id": 0,
+            "block_order": null,
+            "group_id": 0,
+            "block_polygon_points": [
+              [
+                10.0,
+                1.0000009536743164
+              ],
+              [
+                1658.915283203125,
+                21.17021942138672
+              ],
+              [
+                1657.8203125,
+                110.68893432617188
+              ],
+              [
+                8.905029296875,
+                90.51871490478516
+              ]
+            ]
+          },
+          {
+            "block_label": "number",
+            "block_content": "1",
+            "block_bbox": [
+              2626,
+              3,
+              2663,
+              66
+            ],
+            "block_id": 1,
+            "block_order": null,
+            "group_id": 1,
+            "block_polygon_points": [
+              [
+                2626.0,
+                3.0
+              ],
+              [
+                2663.0,
+                3.0
+              ],
+              [
+                2663.0,
+                66.0
+              ],
+              [
+                2626.0,
+                66.0
+              ]
+            ]
+          },
+          {
+            "block_label": "doc_title",
+            "block_content": "全国高中数学联合竞赛模拟题(1)",
+            "block_bbox": [
+              97,
+              225,
+              2557,
+              410
+            ],
+            "block_id": 2,
+            "block_order": 1,
+            "group_id": 2,
+            "block_polygon_points": [
+              [
+                97.2725830078125,
+                206.989013671875
+              ],
+              [
+                2558.49365234375,
+                244.2344970703125
+              ],
+              [
+                2556.0,
+                409.0
+              ],
+              [
+                94.7791748046875,
+                371.7545166015625
+              ]
+            ]
+          },
+          {
+            "block_label": "text",
+            "block_content": "李宝毅 $ ^{1} $ 潘铁 $ ^{2} $",
+            "block_bbox": [
+              915,
+              508,
+              1756,
+              615
+            ],
+            "block_id": 3,
+            "block_order": 2,
+            "group_id": 3,
+            "block_polygon_points": [
+              [
+                915.0,
+                508.0
+              ],
+              [
+                1756.0,
+                508.0
+              ],
+              [
+                1756.0,
+                615.0
+              ],
+              [
+                915.0,
+                615.0
+              ]
+            ]
+          },
+          {
+            "block_label": "text",
+            "block_content": "(1. 天津师范大学数学科学学院, 300387 2. 天津市实验中学, 300074)",
+            "block_bbox": [
+              560,
+              620,
+              2109,
+              709
+            ],
+            "block_id": 4,
+            "block_order": 3,
+            "group_id": 4,
+            "block_polygon_points": [
+              [
+                559.9999389648438,
+                620.0
+              ],
+              [
+                2108.779541015625,
+                637.008544921875
+              ],
+              [
+                2108.0,
+                708.0
+              ],
+              [
+                559.2203979492188,
+                690.991455078125
+              ]
+            ]
+          },
+          {
+            "block_label": "paragraph_title",
+            "block_content": "第一试",
+            "block_bbox": [
+              475,
+              850,
+              811,
+              943
+            ],
+            "block_id": 5,
+            "block_order": 4,
+            "group_id": 5,
+            "block_polygon_points": [
+              [
+                475.0,
+                850.0
+              ],
+              [
+                811.0,
+                850.0
+              ],
+              [
+                811.0,
+                943.0
+              ],
+              [
+                475.0,
+                943.0
+              ]
+            ]
+          },
+          {
+            "block_label": "paragraph_title",
+            "block_content": "一、填空题(每小题8分，共64分)",
+            "block_bbox": [
+              124,
+              990,
+              1117,
+              1093
+            ],
+            "block_id": 6,
+            "block_order": 5,
+            "group_id": 6,
+            "block_polygon_points": [
+              [
+                124.0,
+                1008.0
+              ],
+              [
+                1115.9998779296875,
+                1008.0
+              ],
+              [
+                1115.9998779296875,
+                1092.0
+              ],
+              [
+                124.0,
+                1092.0
+              ]
+            ]
+          },
+          {
+            "block_label": "text",
+            "block_content": "1.  $ \\frac{\\sum_{k=1}^{2020}\\ln\\frac{k}{k+1}}{\\prod_{k=2}^{2020}\\log_{k}(k+1)}= $ ___.",
+            "block_bbox": [
+              114,
+              1091,
+              908,
+              1429
+            ],
+            "block_id": 7,
+            "block_order": 6,
+            "group_id": 7,
+            "block_polygon_points": [
+              [
+                114.0,
+                1091.0
+              ],
+              [
+                908.0,
+                1091.0
+              ],
+              [
+                908.0,
+                1429.0
+              ],
+              [
+                114.0,
+                1429.0
+              ]
+            ]
+          },
+          {
+            "block_label": "text",
+            "block_content": "2. 在 $ \\triangle ABC $中， $ \\angle A $、 $ \\angle B $、 $ \\angle C $的对边分别为 $ a $、 $ b $、 $ c $，向量",
+            "block_bbox": [
+              0,
+              1434,
+              1280,
+              1628
+            ],
+            "block_id": 8,
+            "block_order": 7,
+            "group_id": 8,
+            "block_polygon_points": [
+              [
+                -2.0,
+                1434.0
+              ],
+              [
+                1280.0,
+                1434.0
+              ],
+              [
+                1280.0,
+                1628.0
+              ],
+              [
+                -2.0,
+                1628.0
+              ]
+            ]
+          },
+          {
+            "block_label": "text",
+            "block_content": " $ m=(\\sin A,b+c) $与 $ n=(\\sin C-\\sin B,a+b) $共线.则 $ \\angle C= $ ___.",
+            "block_bbox": [
+              0,
+              1645,
+              1282,
+              1833
+            ],
+            "block_id": 9,
+            "block_order": 8,
+            "group_id": 9,
+            "block_polygon_points": [
+              [
+                -4.0,
+                1645.0
+              ],
+              [
+                1282.0,
+                1645.0
+              ],
+              [
+                1282.0,
+                1833.0
+              ],
+              [
+                -4.0,
+                1833.0
+              ]
+            ]
+          },
+          {
+            "block_label": "text",
+            "block_content": "3. 若  $ z = \\left( \\frac{\\sqrt{2} + \\sqrt{6}}{4} + \\frac{\\sqrt{2} - \\sqrt{6}}{4} i \\right)^{2020} $，则  $ \\frac{1}{z} = $ ___.",
+            "block_bbox": [
+              9,
+              1846,
+              1278,
+              2126
+            ],
+            "block_id": 10,
+            "block_order": 9,
+            "group_id": 10,
+            "block_polygon_points": [
+              [
+                9.0,
+                1846.0
+              ],
+              [
+                1278.0,
+                1846.0
+              ],
+              [
+                1278.0,
+                2126.0
+              ],
+              [
+                9.0,
+                2126.0
+              ]
+            ]
+          },
+          {
+            "block_label": "text",
+            "block_content": "4. 小明的家族成员会说中、英、法、日四国语言, 每两人只能从这四种语言中选一种互相交流. 若小明的家族中不存在一人能用同一种语言和其余至少四人交流, 则小明家族最多有 ___ 人.",
+            "block_bbox": [
+              0,
+              2136,
+              1283,
+              2618
+            ],
+            "block_id": 11,
+            "block_order": 10,
+            "group_id": 11,
+            "block_polygon_points": [
+              [
+                -1.0,
+                2136.0
+              ],
+              [
+                1283.0,
+                2136.0
+              ],
+              [
+                1283.0,
+                2618.0
+              ],
+              [
+                -1.0,
+                2618.0
+              ]
+            ]
+          },
+          {
+            "block_label": "text",
+            "block_content": "5. 若正四棱锥的体积为 $ \\frac{\\sqrt{2}}{3} $，则表面积的最小值为___.",
+            "block_bbox": [
+              0,
+              2634,
+              1276,
+              2899
+            ],
+            "block_id": 12,
+            "block_order": 11,
+            "group_id": 12,
+            "block_polygon_points": [
+              [
+                0.0,
+                2634.0
+              ],
+              [
+                1276.0,
+                2634.0
+              ],
+              [
+                1276.0,
+                2899.0
+              ],
+              [
+                0.0,
+                2899.0
+              ]
+            ]
+          },
+          {
+            "block_label": "text",
+            "block_content": "6. 若集合  $ A = \\{1, 2, \\cdots, 6\\} $，则满足  $ f(f(f(x))) = x $\n函数 $ f:A\\to A $有___个.",
+            "block_bbox": [
+              76,
+              2911,
+              1117,
+              3195
+            ],
+            "block_id": 13,
+            "block_order": 12,
+            "group_id": 13,
+            "block_polygon_points": [
+              [
+                76.0,
+                2911.0
+              ],
+              [
+                1117.0,
+                2911.0
+              ],
+              [
+                1117.0,
+                3195.0
+              ],
+              [
+                76.0,
+                3195.0
+              ]
+            ]
+          },
+          {
+            "block_label": "text",
+            "block_content": "7. 已知点 P 在双曲线  $ \\frac{x^{2}}{4}-y^{2}=1 $ 的右支上运动. 若点 P 绕原点顺时针方向旋转  $ \\frac{\\pi}{3} $ 后与点 Q 重合, 则点 Q 的轨迹方程为 ___.",
+            "block_bbox": [
+              7,
+              3205,
+              1276,
+              3648
+            ],
+            "block_id": 14,
+            "block_order": 13,
+            "group_id": 14,
+            "block_polygon_points": [
+              [
+                7.0,
+                3205.0
+              ],
+              [
+                1276.0,
+                3205.0
+              ],
+              [
+                1276.0,
+                3648.0
+              ],
+              [
+                7.0,
+                3648.0
+              ]
+            ]
+          },
+          {
+            "block_label": "text",
+            "block_content": "8. 设实数 a, b, c, d,  $ e \\geqslant -1 $,  $ a + b + c + d + e = 5 $. 则",
+            "block_bbox": [
+              136,
+              3653,
+              1270,
+              3753
+            ],
+            "block_id": 15,
+            "block_order": 14,
+            "group_id": 15,
+            "block_polygon_points": [
+              [
+                136.0,
+                3653.0
+              ],
+              [
+                1270.0,
+                3653.0
+              ],
+              [
+                1270.0,
+                3753.0
+              ],
+              [
+                136.0,
+                3753.0
+              ]
+            ]
+          },
+          {
+            "block_label": "text",
+            "block_content": "",
+            "block_bbox": [
+              1392,
+              822,
+              1639,
+              899
+            ],
+            "block_id": 16,
+            "block_order": 15,
+            "group_id": 15,
+            "block_polygon_points": [
+              [
+                1392.0,
+                822.0
+              ],
+              [
+                1639.0,
+                822.0
+              ],
+              [
+                1639.0,
+                899.0
+              ],
+              [
+                1392.0,
+                899.0
+              ]
+            ]
+          },
+          {
+            "block_label": "text",
+            "block_content": " $ S = (a + b)(b + c)(c + d)(d + e)(e + a) $\n的最小值为___.",
+            "block_bbox": [
+              1391,
+              919,
+              2630,
+              1108
+            ],
+            "block_id": 17,
+            "block_order": 16,
+            "group_id": 17,
+            "block_polygon_points": [
+              [
+                1391.0,
+                919.0
+              ],
+              [
+                2630.0,
+                919.0
+              ],
+              [
+                2630.0,
+                1108.0
+              ],
+              [
+                1391.0,
+                1108.0
+              ]
+            ]
+          },
+          {
+            "block_label": "paragraph_title",
+            "block_content": "二、解答题（共56分）",
+            "block_bbox": [
+              1522,
+              1119,
+              2140,
+              1200
+            ],
+            "block_id": 18,
+            "block_order": 17,
+            "group_id": 18,
+            "block_polygon_points": [
+              [
+                1522.0,
+                1119.0
+              ],
+              [
+                2140.0,
+                1119.0
+              ],
+              [
+                2140.0,
+                1200.0
+              ],
+              [
+                1522.0,
+                1200.0
+              ]
+            ]
+          },
+          {
+            "block_label": "text",
+            "block_content": "9. (16分) 已知  $ n \\in \\mathbb{N}, n \\geq 2 $. 证明:  $ \\sum_{k=1}^{2n} \\sqrt{1 - \\frac{k^2}{4n^2}} > \\frac{n\\pi}{2} - 1 $.",
+            "block_bbox": [
+              1515,
+              1211,
+              2529,
+              1498
+            ],
+            "block_id": 19,
+            "block_order": 18,
+            "group_id": 19,
+            "block_polygon_points": [
+              [
+                1515.0,
+                1211.0
+              ],
+              [
+                2529.0,
+                1211.0
+              ],
+              [
+                2529.0,
+                1498.0
+              ],
+              [
+                1515.0,
+                1498.0
+              ]
+            ]
+          },
+          {
+            "block_label": "text",
+            "block_content": "10.(20分)设椭圆的方程为",
+            "block_bbox": [
+              1520,
+              1518,
+              2329,
+              1600
+            ],
+            "block_id": 20,
+            "block_order": 19,
+            "group_id": 20,
+            "block_polygon_points": [
+              [
+                1520.0,
+                1518.0
+              ],
+              [
+                2329.0,
+                1518.0
+              ],
+              [
+                2329.0,
+                1600.0
+              ],
+              [
+                1520.0,
+                1600.0
+              ]
+            ]
+          },
+          {
+            "block_label": "display_formula",
+            "block_content": " $$ \\frac{x^{2}}{a^{2}}+\\frac{y^{2}}{b^{2}}=1(a>b>0), $$ ",
+            "block_bbox": [
+              1521,
+              1613,
+              2135,
+              1774
+            ],
+            "block_id": 21,
+            "block_order": 20,
+            "group_id": 21,
+            "block_polygon_points": [
+              [
+                1521.0,
+                1613.0
+              ],
+              [
+                2135.0,
+                1613.0
+              ],
+              [
+                2135.0,
+                1774.0
+              ],
+              [
+                1521.0,
+                1774.0
+              ]
+            ]
+          },
+          {
+            "block_label": "text",
+            "block_content": "线段 PQ 为过左焦点 F 且不与 x 轴垂直的焦点弦. 若在左准线上存在点 R, 使得  $ \\triangle PQR $ 为正三角形, 求椭圆的离心率 e 的取值范围, 并用 e 表示直线 PQ 的斜率.",
+            "block_bbox": [
+              1383,
+              1797,
+              2654,
+              2174
+            ],
+            "block_id": 22,
+            "block_order": 21,
+            "group_id": 22,
+            "block_polygon_points": [
+              [
+                1383.0,
+                1797.0
+              ],
+              [
+                2654.0,
+                1797.0
+              ],
+              [
+                2654.0,
+                2174.0
+              ],
+              [
+                1383.0,
+                2174.0
+              ]
+            ]
+          },
+          {
+            "block_label": "text",
+            "block_content": "11. (20分) 设  $ \\alpha, \\beta $ 为方程\n $ 3x^{2}-2tx-3=0(t\\in\\mathbb{R}) $\n的两个不等实根，函数  $ f(x)=\\frac{3x-t}{x^{2}+1} $ 的定义域为  $ [\\alpha,\\beta] $， $ g(t)=\\max\\{f(x)\\}-\\min\\{f(x)\\} $.\n证明：对于  $ u_{i} \\in \\left...<<truncated sha256:76e21bc0c202a816 chars:279>>",
+            "block_bbox": [
+              1378,
+              2181,
+              2661,
+              2974
+            ],
+            "block_id": 23,
+            "block_order": 22,
+            "group_id": 23,
+            "block_polygon_points": [
+              [
+                1378.0,
+                2181.0
+              ],
+              [
+                2661.0,
+                2181.0
+              ],
+              [
+                2661.0,
+                2974.0
+              ],
+              [
+                1378.0,
+                2974.0
+              ]
+            ]
+          },
+          {
+            "block_label": "display_formula",
+            "block_content": " $$ \\sum_{i=1}^{n}\\frac{1}{g(3\\tan u_{i})}\\leq\\frac{\\sqrt{n^{2}-1}}{3}. $$ ",
+            "block_bbox": [
+              1522,
+              2993,
+              2264,
+              3158
+            ],
+            "block_id": 24,
+            "block_order": 23,
+            "group_id": 24,
+            "block_polygon_points": [
+              [
+                1522.0,
+                2993.0
+              ],
+              [
+                2264.0,
+                2993.0
+              ],
+              [
+                2264.0,
+                3158.0
+              ],
+              [
+                1522.0,
+                3158.0
+              ]
+            ]
+          },
+          {
+            "block_label": "paragraph_title",
+            "block_content": "加试",
+            "block_bbox": [
+              1900,
+              3218,
+              2150,
+              3300
+            ],
+            "block_id": 25,
+            "block_order": 24,
+            "group_id": 25,
+            "block_polygon_points": [
+              [
+                1900.0,
+                3218.0
+              ],
+              [
+                2150.0,
+                3218.0
+              ],
+              [
+                2150.0,
+                3300.0
+              ],
+              [
+                1900.0,
+                3300.0
+              ]
+            ]
+          },
+          {
+            "block_label": "text",
+            "block_content": "一、(40分)如图1,对于$\\triangle ABC$,过点A、C的圆$\\Gamma$分别与边AB、BC交于点D、E,AE与CD交于点O,O在边AB、BC上的射影分别为M、N,P、Q、T、S分别为OD、BD、BE、OE",
+            "block_bbox": [
+              1383,
+              3362,
+              2674,
+              3741
+            ],
+            "block_id": 26,
+            "block_order": 25,
+            "group_id": 26,
+            "block_polygon_points": [
+              [
+                1383.0,
+                3362.0
+              ],
+              [
+                2674.0,
+                3362.0
+              ],
+              [
+                2674.0,
+                3741.0
+              ],
+              [
+                1383.0,
+                3741.0
+              ]
+            ]
+          }
+        ],
+        "doc_preprocessor_res": {
+          "model_settings": {
+            "use_doc_orientation_classify": true,
+            "use_doc_unwarping": true
+          },
+          "angle": 0
+        },
+        "layout_det_res": {
+          "boxes": [
+            {
+              "cls_id": 12,
+              "label": "header",
+              "score": 0.8822129964828491,
+              "coordinate": [
+                10,
+                1,
+                1659,
+                97
+              ],
+              "order": null,
+              "polygon_points": [
+                [
+                  10.0,
+                  1.0000009536743164
+                ],
+                [
+                  1658.915283203125,
+                  21.17021942138672
+                ],
+                [
+                  1657.8203125,
+                  110.68893432617188
+                ],
+                [
+                  8.905029296875,
+                  90.51871490478516
+                ]
+              ]
+            },
+            {
+              "cls_id": 16,
+              "label": "number",
+              "score": 0.6120715737342834,
+              "coordinate": [
+                2626,
+                3,
+                2663,
+                66
+              ],
+              "order": 1,
+              "polygon_points": [
+                [
+                  2626.0,
+                  3.0
+                ],
+                [
+                  2663.0,
+                  3.0
+                ],
+                [
+                  2663.0,
+                  66.0
+                ],
+                [
+                  2626.0,
+                  66.0
+                ]
+              ]
+            },
+            {
+              "cls_id": 6,
+              "label": "doc_title",
+              "score": 0.9175123572349548,
+              "coordinate": [
+                97,
+                225,
+                2557,
+                410
+              ],
+              "order": 2,
+              "polygon_points": [
+                [
+                  97.2725830078125,
+                  206.989013671875
+                ],
+                [
+                  2558.49365234375,
+                  244.2344970703125
+                ],
+                [
+                  2556.0,
+                  409.0
+                ],
+                [
+                  94.7791748046875,
+                  371.7545166015625
+                ]
+              ]
+            },
+            {
+              "cls_id": 22,
+              "label": "text",
+              "score": 0.8171700835227966,
+              "coordinate": [
+                915,
+                508,
+                1756,
+                615
+              ],
+              "order": 3,
+              "polygon_points": [
+                [
+                  915.0,
+                  508.0
+                ],
+                [
+                  1756.0,
+                  508.0
+                ],
+                [
+                  1756.0,
+                  615.0
+                ],
+                [
+                  915.0,
+                  615.0
+                ]
+              ]
+            },
+            {
+              "cls_id": 22,
+              "label": "text",
+              "score": 0.787852942943573,
+              "coordinate": [
+                560,
+                620,
+                2109,
+                709
+              ],
+              "order": 4,
+              "polygon_points": [
+                [
+                  559.9999389648438,
+                  620.0
+                ],
+                [
+                  2108.779541015625,
+                  637.008544921875
+                ],
+                [
+                  2108.0,
+                  708.0
+                ],
+                [
+                  559.2203979492188,
+                  690.991455078125
+                ]
+              ]
+            },
+            {
+              "cls_id": 17,
+              "label": "paragraph_title",
+              "score": 0.8302341103553772,
+              "coordinate": [
+                475,
+                850,
+                811,
+                943
+              ],
+              "order": 5,
+              "polygon_points": [
+                [
+                  475.0,
+                  850.0
+                ],
+                [
+                  811.0,
+                  850.0
+                ],
+                [
+                  811.0,
+                  943.0
+                ],
+                [
+                  475.0,
+                  943.0
+                ]
+              ]
+            },
+            {
+              "cls_id": 17,
+              "label": "paragraph_title",
+              "score": 0.8335471749305725,
+              "coordinate": [
+                124,
+                990,
+                1117,
+                1093
+              ],
+              "order": 6,
+              "polygon_points": [
+                [
+                  124.0,
+                  1008.0
+                ],
+                [
+                  1115.9998779296875,
+                  1008.0
+                ],
+                [
+                  1115.9998779296875,
+                  1092.0
+                ],
+                [
+                  124.0,
+                  1092.0
+                ]
+              ]
+            },
+            {
+              "cls_id": 22,
+              "label": "text",
+              "score": 0.8761982321739197,
+              "coordinate": [
+                114,
+                1091,
+                908,
+                1429
+              ],
+              "order": 7,
+              "polygon_points": [
+                [
+                  114.0,
+                  1091.0
+                ],
+                [
+                  908.0,
+                  1091.0
+                ],
+                [
+                  908.0,
+                  1429.0
+                ],
+                [
+                  114.0,
+                  1429.0
+                ]
+              ]
+            }
+          ],
+          "__boxes_total__": 53
+        }
+      },
+      "exports": {},
+      "input_image_url": "<<redacted-resource:0f1304f993a98140>>",
+      "raw": {
+        "prunedResult": {
+          "page_count": null,
+          "width": 2706,
+          "height": 3772,
+          "model_settings": {
+            "use_doc_preprocessor": true,
+            "use_layout_detection": true,
+            "use_chart_recognition": false,
+            "use_seal_recognition": false,
+            "use_ocr_for_image_block": false,
+            "format_block_content": false,
+            "merge_layout_blocks": true,
+            "markdown_ignore_labels": [
+              "number",
+              "footnote",
+              "header",
+              "header_image",
+              "footer",
+              "footer_image",
+              "aside_text"
+            ],
+            "return_layout_polygon_points": true
+          },
+          "parsing_res_list": [
+            {
+              "block_label": "header",
+              "block_content": "Training Tests for the 2020 National Senior High School Mathematical Competition",
+              "block_bbox": [
+                10,
+                1,
+                1659,
+                97
+              ],
+              "block_id": 0,
+              "block_order": null,
+              "group_id": 0,
+              "block_polygon_points": [
+                [
+                  10.0,
+                  1.0000009536743164
+                ],
+                [
+                  1658.915283203125,
+                  21.17021942138672
+                ],
+                [
+                  1657.8203125,
+                  110.68893432617188
+                ],
+                [
+                  8.905029296875,
+                  90.51871490478516
+                ]
+              ]
+            },
+            {
+              "block_label": "number",
+              "block_content": "1",
+              "block_bbox": [
+                2626,
+                3,
+                2663,
+                66
+              ],
+              "block_id": 1,
+              "block_order": null,
+              "group_id": 1,
+              "block_polygon_points": [
+                [
+                  2626.0,
+                  3.0
+                ],
+                [
+                  2663.0,
+                  3.0
+                ],
+                [
+                  2663.0,
+                  66.0
+                ],
+                [
+                  2626.0,
+                  66.0
+                ]
+              ]
+            },
+            {
+              "block_label": "doc_title",
+              "block_content": "全国高中数学联合竞赛模拟题(1)",
+              "block_bbox": [
+                97,
+                225,
+                2557,
+                410
+              ],
+              "block_id": 2,
+              "block_order": 1,
+              "group_id": 2,
+              "block_polygon_points": [
+                [
+                  97.2725830078125,
+                  206.989013671875
+                ],
+                [
+                  2558.49365234375,
+                  244.2344970703125
+                ],
+                [
+                  2556.0,
+                  409.0
+                ],
+                [
+                  94.7791748046875,
+                  371.7545166015625
+                ]
+              ]
+            },
+            {
+              "block_label": "text",
+              "block_content": "李宝毅 $ ^{1} $ 潘铁 $ ^{2} $",
+              "block_bbox": [
+                915,
+                508,
+                1756,
+                615
+              ],
+              "block_id": 3,
+              "block_order": 2,
+              "group_id": 3,
+              "block_polygon_points": [
+                [
+                  915.0,
+                  508.0
+                ],
+                [
+                  1756.0,
+                  508.0
+                ],
+                [
+                  1756.0,
+                  615.0
+                ],
+                [
+                  915.0,
+                  615.0
+                ]
+              ]
+            },
+            {
+              "block_label": "text",
+              "block_content": "(1. 天津师范大学数学科学学院, 300387 2. 天津市实验中学, 300074)",
+              "block_bbox": [
+                560,
+                620,
+                2109,
+                709
+              ],
+              "block_id": 4,
+              "block_order": 3,
+              "group_id": 4,
+              "block_polygon_points": [
+                [
+                  559.9999389648438,
+                  620.0
+                ],
+                [
+                  2108.779541015625,
+                  637.008544921875
+                ],
+                [
+                  2108.0,
+                  708.0
+                ],
+                [
+                  559.2203979492188,
+                  690.991455078125
+                ]
+              ]
+            },
+            {
+              "block_label": "paragraph_title",
+              "block_content": "第一试",
+              "block_bbox": [
+                475,
+                850,
+                811,
+                943
+              ],
+              "block_id": 5,
+              "block_order": 4,
+              "group_id": 5,
+              "block_polygon_points": [
+                [
+                  475.0,
+                  850.0
+                ],
+                [
+                  811.0,
+                  850.0
+                ],
+                [
+                  811.0,
+                  943.0
+                ],
+                [
+                  475.0,
+                  943.0
+                ]
+              ]
+            },
+            {
+              "block_label": "paragraph_title",
+              "block_content": "一、填空题(每小题8分，共64分)",
+              "block_bbox": [
+                124,
+                990,
+                1117,
+                1093
+              ],
+              "block_id": 6,
+              "block_order": 5,
+              "group_id": 6,
+              "block_polygon_points": [
+                [
+                  124.0,
+                  1008.0
+                ],
+                [
+                  1115.9998779296875,
+                  1008.0
+                ],
+                [
+                  1115.9998779296875,
+                  1092.0
+                ],
+                [
+                  124.0,
+                  1092.0
+                ]
+              ]
+            },
+            {
+              "block_label": "text",
+              "block_content": "1.  $ \\frac{\\sum_{k=1}^{2020}\\ln\\frac{k}{k+1}}{\\prod_{k=2}^{2020}\\log_{k}(k+1)}= $ ___.",
+              "block_bbox": [
+                114,
+                1091,
+                908,
+                1429
+              ],
+              "block_id": 7,
+              "block_order": 6,
+              "group_id": 7,
+              "block_polygon_points": [
+                [
+                  114.0,
+                  1091.0
+                ],
+                [
+                  908.0,
+                  1091.0
+                ],
+                [
+                  908.0,
+                  1429.0
+                ],
+                [
+                  114.0,
+                  1429.0
+                ]
+              ]
+            },
+            {
+              "block_label": "text",
+              "block_content": "2. 在 $ \\triangle ABC $中， $ \\angle A $、 $ \\angle B $、 $ \\angle C $的对边分别为 $ a $、 $ b $、 $ c $，向量",
+              "block_bbox": [
+                0,
+                1434,
+                1280,
+                1628
+              ],
+              "block_id": 8,
+              "block_order": 7,
+              "group_id": 8,
+              "block_polygon_points": [
+                [
+                  -2.0,
+                  1434.0
+                ],
+                [
+                  1280.0,
+                  1434.0
+                ],
+                [
+                  1280.0,
+                  1628.0
+                ],
+                [
+                  -2.0,
+                  1628.0
+                ]
+              ]
+            },
+            {
+              "block_label": "text",
+              "block_content": " $ m=(\\sin A,b+c) $与 $ n=(\\sin C-\\sin B,a+b) $共线.则 $ \\angle C= $ ___.",
+              "block_bbox": [
+                0,
+                1645,
+                1282,
+                1833
+              ],
+              "block_id": 9,
+              "block_order": 8,
+              "group_id": 9,
+              "block_polygon_points": [
+                [
+                  -4.0,
+                  1645.0
+                ],
+                [
+                  1282.0,
+                  1645.0
+                ],
+                [
+                  1282.0,
+                  1833.0
+                ],
+                [
+                  -4.0,
+                  1833.0
+                ]
+              ]
+            },
+            {
+              "block_label": "text",
+              "block_content": "3. 若  $ z = \\left( \\frac{\\sqrt{2} + \\sqrt{6}}{4} + \\frac{\\sqrt{2} - \\sqrt{6}}{4} i \\right)^{2020} $，则  $ \\frac{1}{z} = $ ___.",
+              "block_bbox": [
+                9,
+                1846,
+                1278,
+                2126
+              ],
+              "block_id": 10,
+              "block_order": 9,
+              "group_id": 10,
+              "block_polygon_points": [
+                [
+                  9.0,
+                  1846.0
+                ],
+                [
+                  1278.0,
+                  1846.0
+                ],
+                [
+                  1278.0,
+                  2126.0
+                ],
+                [
+                  9.0,
+                  2126.0
+                ]
+              ]
+            },
+            {
+              "block_label": "text",
+              "block_content": "4. 小明的家族成员会说中、英、法、日四国语言, 每两人只能从这四种语言中选一种互相交流. 若小明的家族中不存在一人能用同一种语言和其余至少四人交流, 则小明家族最多有 ___ 人.",
+              "block_bbox": [
+                0,
+                2136,
+                1283,
+                2618
+              ],
+              "block_id": 11,
+              "block_order": 10,
+              "group_id": 11,
+              "block_polygon_points": [
+                [
+                  -1.0,
+                  2136.0
+                ],
+                [
+                  1283.0,
+                  2136.0
+                ],
+                [
+                  1283.0,
+                  2618.0
+                ],
+                [
+                  -1.0,
+                  2618.0
+                ]
+              ]
+            },
+            {
+              "block_label": "text",
+              "block_content": "5. 若正四棱锥的体积为 $ \\frac{\\sqrt{2}}{3} $，则表面积的最小值为___.",
+              "block_bbox": [
+                0,
+                2634,
+                1276,
+                2899
+              ],
+              "block_id": 12,
+              "block_order": 11,
+              "group_id": 12,
+              "block_polygon_points": [
+                [
+                  0.0,
+                  2634.0
+                ],
+                [
+                  1276.0,
+                  2634.0
+                ],
+                [
+                  1276.0,
+                  2899.0
+                ],
+                [
+                  0.0,
+                  2899.0
+                ]
+              ]
+            },
+            {
+              "block_label": "text",
+              "block_content": "6. 若集合  $ A = \\{1, 2, \\cdots, 6\\} $，则满足  $ f(f(f(x))) = x $\n函数 $ f:A\\to A $有___个.",
+              "block_bbox": [
+                76,
+                2911,
+                1117,
+                3195
+              ],
+              "block_id": 13,
+              "block_order": 12,
+              "group_id": 13,
+              "block_polygon_points": [
+                [
+                  76.0,
+                  2911.0
+                ],
+                [
+                  1117.0,
+                  2911.0
+                ],
+                [
+                  1117.0,
+                  3195.0
+                ],
+                [
+                  76.0,
+                  3195.0
+                ]
+              ]
+            },
+            {
+              "block_label": "text",
+              "block_content": "7. 已知点 P 在双曲线  $ \\frac{x^{2}}{4}-y^{2}=1 $ 的右支上运动. 若点 P 绕原点顺时针方向旋转  $ \\frac{\\pi}{3} $ 后与点 Q 重合, 则点 Q 的轨迹方程为 ___.",
+              "block_bbox": [
+                7,
+                3205,
+                1276,
+                3648
+              ],
+              "block_id": 14,
+              "block_order": 13,
+              "group_id": 14,
+              "block_polygon_points": [
+                [
+                  7.0,
+                  3205.0
+                ],
+                [
+                  1276.0,
+                  3205.0
+                ],
+                [
+                  1276.0,
+                  3648.0
+                ],
+                [
+                  7.0,
+                  3648.0
+                ]
+              ]
+            },
+            {
+              "block_label": "text",
+              "block_content": "8. 设实数 a, b, c, d,  $ e \\geqslant -1 $,  $ a + b + c + d + e = 5 $. 则",
+              "block_bbox": [
+                136,
+                3653,
+                1270,
+                3753
+              ],
+              "block_id": 15,
+              "block_order": 14,
+              "group_id": 15,
+              "block_polygon_points": [
+                [
+                  136.0,
+                  3653.0
+                ],
+                [
+                  1270.0,
+                  3653.0
+                ],
+                [
+                  1270.0,
+                  3753.0
+                ],
+                [
+                  136.0,
+                  3753.0
+                ]
+              ]
+            },
+            {
+              "block_label": "text",
+              "block_content": "",
+              "block_bbox": [
+                1392,
+                822,
+                1639,
+                899
+              ],
+              "block_id": 16,
+              "block_order": 15,
+              "group_id": 15,
+              "block_polygon_points": [
+                [
+                  1392.0,
+                  822.0
+                ],
+                [
+                  1639.0,
+                  822.0
+                ],
+                [
+                  1639.0,
+                  899.0
+                ],
+                [
+                  1392.0,
+                  899.0
+                ]
+              ]
+            },
+            {
+              "block_label": "text",
+              "block_content": " $ S = (a + b)(b + c)(c + d)(d + e)(e + a) $\n的最小值为___.",
+              "block_bbox": [
+                1391,
+                919,
+                2630,
+                1108
+              ],
+              "block_id": 17,
+              "block_order": 16,
+              "group_id": 17,
+              "block_polygon_points": [
+                [
+                  1391.0,
+                  919.0
+                ],
+                [
+                  2630.0,
+                  919.0
+                ],
+                [
+                  2630.0,
+                  1108.0
+                ],
+                [
+                  1391.0,
+                  1108.0
+                ]
+              ]
+            },
+            {
+              "block_label": "paragraph_title",
+              "block_content": "二、解答题（共56分）",
+              "block_bbox": [
+                1522,
+                1119,
+                2140,
+                1200
+              ],
+              "block_id": 18,
+              "block_order": 17,
+              "group_id": 18,
+              "block_polygon_points": [
+                [
+                  1522.0,
+                  1119.0
+                ],
+                [
+                  2140.0,
+                  1119.0
+                ],
+                [
+                  2140.0,
+                  1200.0
+                ],
+                [
+                  1522.0,
+                  1200.0
+                ]
+              ]
+            },
+            {
+              "block_label": "text",
+              "block_content": "9. (16分) 已知  $ n \\in \\mathbb{N}, n \\geq 2 $. 证明:  $ \\sum_{k=1}^{2n} \\sqrt{1 - \\frac{k^2}{4n^2}} > \\frac{n\\pi}{2} - 1 $.",
+              "block_bbox": [
+                1515,
+                1211,
+                2529,
+                1498
+              ],
+              "block_id": 19,
+              "block_order": 18,
+              "group_id": 19,
+              "block_polygon_points": [
+                [
+                  1515.0,
+                  1211.0
+                ],
+                [
+                  2529.0,
+                  1211.0
+                ],
+                [
+                  2529.0,
+                  1498.0
+                ],
+                [
+                  1515.0,
+                  1498.0
+                ]
+              ]
+            },
+            {
+              "block_label": "text",
+              "block_content": "10.(20分)设椭圆的方程为",
+              "block_bbox": [
+                1520,
+                1518,
+                2329,
+                1600
+              ],
+              "block_id": 20,
+              "block_order": 19,
+              "group_id": 20,
+              "block_polygon_points": [
+                [
+                  1520.0,
+                  1518.0
+                ],
+                [
+                  2329.0,
+                  1518.0
+                ],
+                [
+                  2329.0,
+                  1600.0
+                ],
+                [
+                  1520.0,
+                  1600.0
+                ]
+              ]
+            },
+            {
+              "block_label": "display_formula",
+              "block_content": " $$ \\frac{x^{2}}{a^{2}}+\\frac{y^{2}}{b^{2}}=1(a>b>0), $$ ",
+              "block_bbox": [
+                1521,
+                1613,
+                2135,
+                1774
+              ],
+              "block_id": 21,
+              "block_order": 20,
+              "group_id": 21,
+              "block_polygon_points": [
+                [
+                  1521.0,
+                  1613.0
+                ],
+                [
+                  2135.0,
+                  1613.0
+                ],
+                [
+                  2135.0,
+                  1774.0
+                ],
+                [
+                  1521.0,
+                  1774.0
+                ]
+              ]
+            },
+            {
+              "block_label": "text",
+              "block_content": "线段 PQ 为过左焦点 F 且不与 x 轴垂直的焦点弦. 若在左准线上存在点 R, 使得  $ \\triangle PQR $ 为正三角形, 求椭圆的离心率 e 的取值范围, 并用 e 表示直线 PQ 的斜率.",
+              "block_bbox": [
+                1383,
+                1797,
+                2654,
+                2174
+              ],
+              "block_id": 22,
+              "block_order": 21,
+              "group_id": 22,
+              "block_polygon_points": [
+                [
+                  1383.0,
+                  1797.0
+                ],
+                [
+                  2654.0,
+                  1797.0
+                ],
+                [
+                  2654.0,
+                  2174.0
+                ],
+                [
+                  1383.0,
+                  2174.0
+                ]
+              ]
+            },
+            {
+              "block_label": "text",
+              "block_content": "11. (20分) 设  $ \\alpha, \\beta $ 为方程\n $ 3x^{2}-2tx-3=0(t\\in\\mathbb{R}) $\n的两个不等实根，函数  $ f(x)=\\frac{3x-t}{x^{2}+1} $ 的定义域为  $ [\\alpha,\\beta] $， $ g(t)=\\max\\{f(x)\\}-\\min\\{f(x)\\} $.\n证明：对于  $ u_{i} \\in \\left...<<truncated sha256:76e21bc0c202a816 chars:279>>",
+              "block_bbox": [
+                1378,
+                2181,
+                2661,
+                2974
+              ],
+              "block_id": 23,
+              "block_order": 22,
+              "group_id": 23,
+              "block_polygon_points": [
+                [
+                  1378.0,
+                  2181.0
+                ],
+                [
+                  2661.0,
+                  2181.0
+                ],
+                [
+                  2661.0,
+                  2974.0
+                ],
+                [
+                  1378.0,
+                  2974.0
+                ]
+              ]
+            },
+            {
+              "block_label": "display_formula",
+              "block_content": " $$ \\sum_{i=1}^{n}\\frac{1}{g(3\\tan u_{i})}\\leq\\frac{\\sqrt{n^{2}-1}}{3}. $$ ",
+              "block_bbox": [
+                1522,
+                2993,
+                2264,
+                3158
+              ],
+              "block_id": 24,
+              "block_order": 23,
+              "group_id": 24,
+              "block_polygon_points": [
+                [
+                  1522.0,
+                  2993.0
+                ],
+                [
+                  2264.0,
+                  2993.0
+                ],
+                [
+                  2264.0,
+                  3158.0
+                ],
+                [
+                  1522.0,
+                  3158.0
+                ]
+              ]
+            },
+            {
+              "block_label": "paragraph_title",
+              "block_content": "加试",
+              "block_bbox": [
+                1900,
+                3218,
+                2150,
+                3300
+              ],
+              "block_id": 25,
+              "block_order": 24,
+              "group_id": 25,
+              "block_polygon_points": [
+                [
+                  1900.0,
+                  3218.0
+                ],
+                [
+                  2150.0,
+                  3218.0
+                ],
+                [
+                  2150.0,
+                  3300.0
+                ],
+                [
+                  1900.0,
+                  3300.0
+                ]
+              ]
+            },
+            {
+              "block_label": "text",
+              "block_content": "一、(40分)如图1,对于$\\triangle ABC$,过点A、C的圆$\\Gamma$分别与边AB、BC交于点D、E,AE与CD交于点O,O在边AB、BC上的射影分别为M、N,P、Q、T、S分别为OD、BD、BE、OE",
+              "block_bbox": [
+                1383,
+                3362,
+                2674,
+                3741
+              ],
+              "block_id": 26,
+              "block_order": 25,
+              "group_id": 26,
+              "block_polygon_points": [
+                [
+                  1383.0,
+                  3362.0
+                ],
+                [
+                  2674.0,
+                  3362.0
+                ],
+                [
+                  2674.0,
+                  3741.0
+                ],
+                [
+                  1383.0,
+                  3741.0
+                ]
+              ]
+            }
+          ],
+          "doc_preprocessor_res": {
+            "model_settings": {
+              "use_doc_orientation_classify": true,
+              "use_doc_unwarping": true
+            },
+            "angle": 0
+          },
+          "layout_det_res": {
+            "boxes": [
+              {
+                "cls_id": 12,
+                "label": "header",
+                "score": 0.8822129964828491,
+                "coordinate": [
+                  10,
+                  1,
+                  1659,
+                  97
+                ],
+                "order": null,
+                "polygon_points": [
+                  [
+                    10.0,
+                    1.0000009536743164
+                  ],
+                  [
+                    1658.915283203125,
+                    21.17021942138672
+                  ],
+                  [
+                    1657.8203125,
+                    110.68893432617188
+                  ],
+                  [
+                    8.905029296875,
+                    90.51871490478516
+                  ]
+                ]
+              },
+              {
+                "cls_id": 16,
+                "label": "number",
+                "score": 0.6120715737342834,
+                "coordinate": [
+                  2626,
+                  3,
+                  2663,
+                  66
+                ],
+                "order": 1,
+                "polygon_points": [
+                  [
+                    2626.0,
+                    3.0
+                  ],
+                  [
+                    2663.0,
+                    3.0
+                  ],
+                  [
+                    2663.0,
+                    66.0
+                  ],
+                  [
+                    2626.0,
+                    66.0
+                  ]
+                ]
+              },
+              {
+                "cls_id": 6,
+                "label": "doc_title",
+                "score": 0.9175123572349548,
+                "coordinate": [
+                  97,
+                  225,
+                  2557,
+                  410
+                ],
+                "order": 2,
+                "polygon_points": [
+                  [
+                    97.2725830078125,
+                    206.989013671875
+                  ],
+                  [
+                    2558.49365234375,
+                    244.2344970703125
+                  ],
+                  [
+                    2556.0,
+                    409.0
+                  ],
+                  [
+                    94.7791748046875,
+                    371.7545166015625
+                  ]
+                ]
+              },
+              {
+                "cls_id": 22,
+                "label": "text",
+                "score": 0.8171700835227966,
+                "coordinate": [
+                  915,
+                  508,
+                  1756,
+                  615
+                ],
+                "order": 3,
+                "polygon_points": [
+                  [
+                    915.0,
+                    508.0
+                  ],
+                  [
+                    1756.0,
+                    508.0
+                  ],
+                  [
+                    1756.0,
+                    615.0
+                  ],
+                  [
+                    915.0,
+                    615.0
+                  ]
+                ]
+              },
+              {
+                "cls_id": 22,
+                "label": "text",
+                "score": 0.787852942943573,
+                "coordinate": [
+                  560,
+                  620,
+                  2109,
+                  709
+                ],
+                "order": 4,
+                "polygon_points": [
+                  [
+                    559.9999389648438,
+                    620.0
+                  ],
+                  [
+                    2108.779541015625,
+                    637.008544921875
+                  ],
+                  [
+                    2108.0,
+                    708.0
+                  ],
+                  [
+                    559.2203979492188,
+                    690.991455078125
+                  ]
+                ]
+              },
+              {
+                "cls_id": 17,
+                "label": "paragraph_title",
+                "score": 0.8302341103553772,
+                "coordinate": [
+                  475,
+                  850,
+                  811,
+                  943
+                ],
+                "order": 5,
+                "polygon_points": [
+                  [
+                    475.0,
+                    850.0
+                  ],
+                  [
+                    811.0,
+                    850.0
+                  ],
+                  [
+                    811.0,
+                    943.0
+                  ],
+                  [
+                    475.0,
+                    943.0
+                  ]
+                ]
+              },
+              {
+                "cls_id": 17,
+                "label": "paragraph_title",
+                "score": 0.8335471749305725,
+                "coordinate": [
+                  124,
+                  990,
+                  1117,
+                  1093
+                ],
+                "order": 6,
+                "polygon_points": [
+                  [
+                    124.0,
+                    1008.0
+                  ],
+                  [
+                    1115.9998779296875,
+                    1008.0
+                  ],
+                  [
+                    1115.9998779296875,
+                    1092.0
+                  ],
+                  [
+                    124.0,
+                    1092.0
+                  ]
+                ]
+              },
+              {
+                "cls_id": 22,
+                "label": "text",
+                "score": 0.8761982321739197,
+                "coordinate": [
+                  114,
+                  1091,
+                  908,
+                  1429
+                ],
+                "order": 7,
+                "polygon_points": [
+                  [
+                    114.0,
+                    1091.0
+                  ],
+                  [
+                    908.0,
+                    1091.0
+                  ],
+                  [
+                    908.0,
+                    1429.0
+                  ],
+                  [
+                    114.0,
+                    1429.0
+                  ]
+                ]
+              }
+            ],
+            "__boxes_total__": 53
+          }
+        },
+        "markdown": {
+          "text": "# 全国高中数学联合竞赛模拟题(1)\n\n李宝毅 $ ^{1} $ 潘铁 $ ^{2} $\n\n(1. 天津师范大学数学科学学院, 300387 2. 天津市实验中学, 300074)\n\n## 第一试\n\n## 一、 填空题(每小题8分，共64分)\n\n1.  $ \\frac{\\sum_{k=1}^{2020}\\ln\\frac{k}{k+1}}{\\prod_{k=2}^{2020}\\log_{k}(k+1...<<truncated sha256:2bce2dd30d406fca chars:1778>>",
+          "images": {}
+        },
+        "outputImages": {
+          "layout_det_res": "<<redacted-resource:20a9afef73c69bd0>>"
+        },
+        "inputImage": "<<redacted-resource:0f1304f993a98140>>"
+      }
+    },
+    {
+      "position": 1,
+      "markdown_text": "的中点. 证明:  $ \\triangle MPQ $ 的外接圆与  $ \\triangle NST $ 的外接圆的一个交点在 DE 上.\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_117_359_1126_1065.jpg\" alt=\"Image\" width=\"37%\" /></div>\n\n\n<div s...<<truncated sha256:c063a7d8ec50431a chars:2656>>",
+      "markdown_images": {
+        "imgs/img_in_image_box_117_359_1126_1065.jpg": "<<redacted-resource:b8cb94a614b2e9a8>>"
+      },
+      "output_images": {
+        "layout_det_res": "<<redacted-resource:3ed199ce52e2fb4e>>"
+      },
+      "pruned_result": {
+        "page_count": null,
+        "width": 2706,
+        "height": 3772,
+        "model_settings": {
+          "use_doc_preprocessor": true,
+          "use_layout_detection": true,
+          "use_chart_recognition": false,
+          "use_seal_recognition": false,
+          "use_ocr_for_image_block": false,
+          "format_block_content": false,
+          "merge_layout_blocks": true,
+          "markdown_ignore_labels": [
+            "number",
+            "footnote",
+            "header",
+            "header_image",
+            "footer",
+            "footer_image",
+            "aside_text"
+          ],
+          "return_layout_polygon_points": true
+        },
+        "parsing_res_list": [
+          {
+            "block_label": "number",
+            "block_content": "2",
+            "block_bbox": [
+              8,
+              2,
+              71,
+              41
+            ],
+            "block_id": 0,
+            "block_order": null,
+            "group_id": 0,
+            "block_polygon_points": [
+              [
+                8.0,
+                2.0
+              ],
+              [
+                71.0,
+                2.0
+              ],
+              [
+                71.0,
+                41.0
+              ],
+              [
+                8.0,
+                41.0
+              ]
+            ]
+          },
+          {
+            "block_label": "header",
+            "block_content": "2020年全国高中数学联合竞赛模拟题集",
+            "block_bbox": [
+              1795,
+              10,
+              2687,
+              76
+            ],
+            "block_id": 1,
+            "block_order": null,
+            "group_id": 1,
+            "block_polygon_points": [
+              [
+                1795.0,
+                10.0
+              ],
+              [
+                2687.0,
+                10.0
+              ],
+              [
+                2687.0,
+                76.0
+              ],
+              [
+                1795.0,
+                76.0
+              ]
+            ]
+          },
+          {
+            "block_label": "text",
+            "block_content": "的中点. 证明:  $ \\triangle MPQ $ 的外接圆与  $ \\triangle NST $ 的外接圆的一个交点在 DE 上.",
+            "block_bbox": [
+              0,
+              110,
+              1270,
+              301
+            ],
+            "block_id": 2,
+            "block_order": 1,
+            "group_id": 2,
+            "block_polygon_points": [
+              [
+                0.0,
+                110.0
+              ],
+              [
+                1270.0,
+                110.0
+              ],
+              [
+                1270.0,
+                301.0
+              ],
+              [
+                0.0,
+                301.0
+              ]
+            ]
+          },
+          {
+            "block_label": "image",
+            "block_content": "",
+            "block_bbox": [
+              117,
+              359,
+              1126,
+              1065
+            ],
+            "block_id": 3,
+            "block_order": null,
+            "group_id": 3,
+            "block_polygon_points": [
+              [
+                117.0,
+                359.0
+              ],
+              [
+                1126.0,
+                359.0
+              ],
+              [
+                1126.0,
+                1065.0
+              ],
+              [
+                117.0,
+                1065.0
+              ]
+            ]
+          },
+          {
+            "block_label": "figure_title",
+            "block_content": "图1",
+            "block_bbox": [
+              576,
+              1128,
+              671,
+              1186
+            ],
+            "block_id": 4,
+            "block_order": null,
+            "group_id": 4,
+            "block_polygon_points": [
+              [
+                576.0,
+                1128.0
+              ],
+              [
+                671.0,
+                1128.0
+              ],
+              [
+                671.0,
+                1186.0
+              ],
+              [
+                576.0,
+                1186.0
+              ]
+            ]
+          },
+          {
+            "block_label": "text",
+            "block_content": "二、(40分)求所有满足下列条件的不超过 $ 2020^{2020} $的正整数n:\n $ n|2^n, (n-1)!(2^n-1), (n-2)!(2^n-2). $",
+            "block_bbox": [
+              5,
+              1210,
+              1258,
+              1485
+            ],
+            "block_id": 5,
+            "block_order": 2,
+            "group_id": 5,
+            "block_polygon_points": [
+              [
+                5.0,
+                1210.0
+              ],
+              [
+                1258.0,
+                1210.0
+              ],
+              [
+                1258.0,
+                1485.0
+              ],
+              [
+                5.0,
+                1485.0
+              ]
+            ]
+          },
+          {
+            "block_label": "text",
+            "block_content": "三、(50分)设$S$是满足下面条件的项数为2020的序列$\\{a_n|n=1,2,\\cdots,2\\ 020\\}$的集合：$a_n\\in\\{1,2,\\cdots,6,9\\}$，且$\\sum_{n=1}^{2020}a_n=9\\ 000$。证明：$S$中至多有$2^{9\\ 000}\\left(\\frac{2\\ 020}{2\\ 048}\\right)^{2\\ 020}$个序列。",
+            "block_bbox": [
+              0,
+              1503,
+              1260,
+              2015
+            ],
+            "block_id": 6,
+            "block_order": 3,
+            "group_id": 6,
+            "block_polygon_points": [
+              [
+                -2.0,
+                1503.0
+              ],
+              [
+                1260.0,
+                1503.0
+              ],
+              [
+                1260.0,
+                2015.0
+              ],
+              [
+                -2.0,
+                2015.0
+              ]
+            ]
+          },
+          {
+            "block_label": "text",
+            "block_content": "四、(50分)对于正20面体的30条棱分别用红、黄、蓝三色之一染色.问:有多少种染色方案,使得对于正20面体的20个侧面(三角形)恰有两条棱同色?",
+            "block_bbox": [
+              0,
+              2034,
+              1256,
+              2397
+            ],
+            "block_id": 7,
+            "block_order": 4,
+            "group_id": 7,
+            "block_polygon_points": [
+              [
+                0.0,
+                2034.0
+              ],
+              [
+                1256.0,
+                2034.0
+              ],
+              [
+                1256.0,
+                2397.0
+              ],
+              [
+                0.0,
+                2397.0
+              ]
+            ]
+          },
+          {
+            "block_label": "paragraph_title",
+            "block_content": "参考答案",
+            "block_bbox": [
+              376,
+              2431,
+              870,
+              2537
+            ],
+            "block_id": 8,
+            "block_order": 5,
+            "group_id": 8,
+            "block_polygon_points": [
+              [
+                376.0,
+                2431.0
+              ],
+              [
+                870.0,
+                2431.0
+              ],
+              [
+                870.0,
+                2537.0
+              ],
+              [
+                376.0,
+                2537.0
+              ]
+            ]
+          },
+          {
+            "block_label": "text",
+            "block_content": "第一试",
+            "block_bbox": [
+              456,
+              2554,
+              780,
+              2643
+            ],
+            "block_id": 9,
+            "block_order": 6,
+            "group_id": 9,
+            "block_polygon_points": [
+              [
+                456.0,
+                2554.0
+              ],
+              [
+                780.0,
+                2554.0
+              ],
+              [
+                780.0,
+                2643.0
+              ],
+              [
+                456.0,
+                2643.0
+              ]
+            ]
+          },
+          {
+            "block_label": "display_formula",
+            "block_content": " $$ \\begin{aligned}& 一、1.-ln2.\\\\&\\frac{\\displaystyle\\sum_{k=1}^{2\\ 020}ln\\frac{k}{k+1}}{\\prod_{k=2}^{2\\ 020}log_{k}(k+1)}\\\\&=\\frac{ln\\frac{1}{2}+ln\\frac{2}{3}+\\cdots+ln\\frac{2\\ 020}{2\\ 021}}{\\log_{2}3...<<truncated sha256:e7b3a22b56f1183e chars:464>>",
+            "block_bbox": [
+              19,
+              2695,
+              1039,
+              3748
+            ],
+            "block_id": 10,
+            "block_order": 7,
+            "group_id": 10,
+            "block_polygon_points": [
+              [
+                19.0,
+                2695.0
+              ],
+              [
+                1039.0,
+                2695.0
+              ],
+              [
+                1039.0,
+                3748.0
+              ],
+              [
+                19.0,
+                3748.0
+              ]
+            ]
+          },
+          {
+            "block_label": "text",
+            "block_content": "$$= \\frac { - \\ln 2 \\, 021 } { \\ln 2 \\ln 2 }$$\n\n$$= - \\ln 2 .$$\n\n2. $\\frac { 2 \\pi } { 3 }$.\n\n因为向量 $m$ 与 $n$ 共线，所以，\n$$\\frac { \\sin A } { \\sin C - \\sin B } = \\frac { b + c } { a + b }$$\n\n由正弦定理得\n$$\\frac...<<truncated sha256:ba70782a75514548 chars:1517>>",
+            "block_bbox": [
+              1452,
+              135,
+              2668,
+              3451
+            ],
+            "block_id": 11,
+            "block_order": 8,
+            "group_id": 11,
+            "block_polygon_points": [
+              [
+                1452.0,
+                135.0
+              ],
+              [
+                2668.0,
+                135.0
+              ],
+              [
+                2668.0,
+                3451.0
+              ],
+              [
+                1452.0,
+                3451.0
+              ]
+            ]
+          },
+          {
+            "block_label": "text",
+            "block_content": "每名成员用点表示,两成员从四种语言中选一种语言互相交流,即对应的两点用四色(红、黄、蓝、黑)线中的一色线相连.",
+            "block_bbox": [
+              1350,
+              3424,
+              2661,
+              3713
+            ],
+            "block_id": 12,
+            "block_order": 9,
+            "group_id": 12,
+            "block_polygon_points": [
+              [
+                1350.0,
+                3424.0
+              ],
+              [
+                2661.0,
+                3424.0
+              ],
+              [
+                2661.0,
+                3713.0
+              ],
+              [
+                1350.0,
+                3713.0
+              ]
+            ]
+          }
+        ],
+        "doc_preprocessor_res": {
+          "model_settings": {
+            "use_doc_orientation_classify": true,
+            "use_doc_unwarping": true
+          },
+          "angle": 0
+        },
+        "layout_det_res": {
+          "boxes": [
+            {
+              "cls_id": 16,
+              "label": "number",
+              "score": 0.3274378776550293,
+              "coordinate": [
+                8,
+                2,
+                71,
+                41
+              ],
+              "order": 1,
+              "polygon_points": [
+                [
+                  8.0,
+                  2.0
+                ],
+                [
+                  71.0,
+                  2.0
+                ],
+                [
+                  71.0,
+                  41.0
+                ],
+                [
+                  8.0,
+                  41.0
+                ]
+              ]
+            },
+            {
+              "cls_id": 12,
+              "label": "header",
+              "score": 0.8428677916526794,
+              "coordinate": [
+                1795,
+                10,
+                2687,
+                76
+              ],
+              "order": null,
+              "polygon_points": [
+                [
+                  1795.0,
+                  10.0
+                ],
+                [
+                  2687.0,
+                  10.0
+                ],
+                [
+                  2687.0,
+                  76.0
+                ],
+                [
+                  1795.0,
+                  76.0
+                ]
+              ]
+            },
+            {
+              "cls_id": 22,
+              "label": "text",
+              "score": 0.8833050727844238,
+              "coordinate": [
+                0,
+                110,
+                1270,
+                301
+              ],
+              "order": 2,
+              "polygon_points": [
+                [
+                  0.0,
+                  110.0
+                ],
+                [
+                  1270.0,
+                  110.0
+                ],
+                [
+                  1270.0,
+                  301.0
+                ],
+                [
+                  0.0,
+                  301.0
+                ]
+              ]
+            },
+            {
+              "cls_id": 15,
+              "label": "inline_formula",
+              "score": 0.7132636904716492,
+              "coordinate": [
+                396,
+                122,
+                624,
+                196
+              ],
+              "order": 3,
+              "polygon_points": [
+                [
+                  396.0,
+                  122.0
+                ],
+                [
+                  624.0,
+                  122.0
+                ],
+                [
+                  624.0,
+                  196.0
+                ],
+                [
+                  396.0,
+                  196.0
+                ]
+              ]
+            },
+            {
+              "cls_id": 15,
+              "label": "inline_formula",
+              "score": 0.7435078024864197,
+              "coordinate": [
+                977,
+                128,
+                1184,
+                200
+              ],
+              "order": 4,
+              "polygon_points": [
+                [
+                  977.0,
+                  128.0
+                ],
+                [
+                  1184.0,
+                  128.0
+                ],
+                [
+                  1184.0,
+                  200.0
+                ],
+                [
+                  977.0,
+                  200.0
+                ]
+              ]
+            },
+            {
+              "cls_id": 14,
+              "label": "image",
+              "score": 0.9372195601463318,
+              "coordinate": [
+                117,
+                359,
+                1126,
+                1065
+              ],
+              "order": null,
+              "polygon_points": [
+                [
+                  117.0,
+                  359.0
+                ],
+                [
+                  1126.0,
+                  359.0
+                ],
+                [
+                  1126.0,
+                  1065.0
+                ],
+                [
+                  117.0,
+                  1065.0
+                ]
+              ]
+            },
+            {
+              "cls_id": 7,
+              "label": "figure_title",
+              "score": 0.769015371799469,
+              "coordinate": [
+                576,
+                1128,
+                671,
+                1186
+              ],
+              "order": null,
+              "polygon_points": [
+                [
+                  576.0,
+                  1128.0
+                ],
+                [
+                  671.0,
+                  1128.0
+                ],
+                [
+                  671.0,
+                  1186.0
+                ],
+                [
+                  576.0,
+                  1186.0
+                ]
+              ]
+            },
+            {
+              "cls_id": 22,
+              "label": "text",
+              "score": 0.5647103190422058,
+              "coordinate": [
+                5,
+                1210,
+                1258,
+                1485
+              ],
+              "order": 5,
+              "polygon_points": [
+                [
+                  5.0,
+                  1210.0
+                ],
+                [
+                  1258.0,
+                  1210.0
+                ],
+                [
+                  1258.0,
+                  1485.0
+                ],
+                [
+                  5.0,
+                  1485.0
+                ]
+              ]
+            }
+          ],
+          "__boxes_total__": 39
+        }
+      },
+      "exports": {},
+      "input_image_url": "<<redacted-resource:791745169219710b>>",
+      "raw": {
+        "prunedResult": {
+          "page_count": null,
+          "width": 2706,
+          "height": 3772,
+          "model_settings": {
+            "use_doc_preprocessor": true,
+            "use_layout_detection": true,
+            "use_chart_recognition": false,
+            "use_seal_recognition": false,
+            "use_ocr_for_image_block": false,
+            "format_block_content": false,
+            "merge_layout_blocks": true,
+            "markdown_ignore_labels": [
+              "number",
+              "footnote",
+              "header",
+              "header_image",
+              "footer",
+              "footer_image",
+              "aside_text"
+            ],
+            "return_layout_polygon_points": true
+          },
+          "parsing_res_list": [
+            {
+              "block_label": "number",
+              "block_content": "2",
+              "block_bbox": [
+                8,
+                2,
+                71,
+                41
+              ],
+              "block_id": 0,
+              "block_order": null,
+              "group_id": 0,
+              "block_polygon_points": [
+                [
+                  8.0,
+                  2.0
+                ],
+                [
+                  71.0,
+                  2.0
+                ],
+                [
+                  71.0,
+                  41.0
+                ],
+                [
+                  8.0,
+                  41.0
+                ]
+              ]
+            },
+            {
+              "block_label": "header",
+              "block_content": "2020年全国高中数学联合竞赛模拟题集",
+              "block_bbox": [
+                1795,
+                10,
+                2687,
+                76
+              ],
+              "block_id": 1,
+              "block_order": null,
+              "group_id": 1,
+              "block_polygon_points": [
+                [
+                  1795.0,
+                  10.0
+                ],
+                [
+                  2687.0,
+                  10.0
+                ],
+                [
+                  2687.0,
+                  76.0
+                ],
+                [
+                  1795.0,
+                  76.0
+                ]
+              ]
+            },
+            {
+              "block_label": "text",
+              "block_content": "的中点. 证明:  $ \\triangle MPQ $ 的外接圆与  $ \\triangle NST $ 的外接圆的一个交点在 DE 上.",
+              "block_bbox": [
+                0,
+                110,
+                1270,
+                301
+              ],
+              "block_id": 2,
+              "block_order": 1,
+              "group_id": 2,
+              "block_polygon_points": [
+                [
+                  0.0,
+                  110.0
+                ],
+                [
+                  1270.0,
+                  110.0
+                ],
+                [
+                  1270.0,
+                  301.0
+                ],
+                [
+                  0.0,
+                  301.0
+                ]
+              ]
+            },
+            {
+              "block_label": "image",
+              "block_content": "",
+              "block_bbox": [
+                117,
+                359,
+                1126,
+                1065
+              ],
+              "block_id": 3,
+              "block_order": null,
+              "group_id": 3,
+              "block_polygon_points": [
+                [
+                  117.0,
+                  359.0
+                ],
+                [
+                  1126.0,
+                  359.0
+                ],
+                [
+                  1126.0,
+                  1065.0
+                ],
+                [
+                  117.0,
+                  1065.0
+                ]
+              ]
+            },
+            {
+              "block_label": "figure_title",
+              "block_content": "图1",
+              "block_bbox": [
+                576,
+                1128,
+                671,
+                1186
+              ],
+              "block_id": 4,
+              "block_order": null,
+              "group_id": 4,
+              "block_polygon_points": [
+                [
+                  576.0,
+                  1128.0
+                ],
+                [
+                  671.0,
+                  1128.0
+                ],
+                [
+                  671.0,
+                  1186.0
+                ],
+                [
+                  576.0,
+                  1186.0
+                ]
+              ]
+            },
+            {
+              "block_label": "text",
+              "block_content": "二、(40分)求所有满足下列条件的不超过 $ 2020^{2020} $的正整数n:\n $ n|2^n, (n-1)!(2^n-1), (n-2)!(2^n-2). $",
+              "block_bbox": [
+                5,
+                1210,
+                1258,
+                1485
+              ],
+              "block_id": 5,
+              "block_order": 2,
+              "group_id": 5,
+              "block_polygon_points": [
+                [
+                  5.0,
+                  1210.0
+                ],
+                [
+                  1258.0,
+                  1210.0
+                ],
+                [
+                  1258.0,
+                  1485.0
+                ],
+                [
+                  5.0,
+                  1485.0
+                ]
+              ]
+            },
+            {
+              "block_label": "text",
+              "block_content": "三、(50分)设$S$是满足下面条件的项数为2020的序列$\\{a_n|n=1,2,\\cdots,2\\ 020\\}$的集合：$a_n\\in\\{1,2,\\cdots,6,9\\}$，且$\\sum_{n=1}^{2020}a_n=9\\ 000$。证明：$S$中至多有$2^{9\\ 000}\\left(\\frac{2\\ 020}{2\\ 048}\\right)^{2\\ 020}$个序列。",
+              "block_bbox": [
+                0,
+                1503,
+                1260,
+                2015
+              ],
+              "block_id": 6,
+              "block_order": 3,
+              "group_id": 6,
+              "block_polygon_points": [
+                [
+                  -2.0,
+                  1503.0
+                ],
+                [
+                  1260.0,
+                  1503.0
+                ],
+                [
+                  1260.0,
+                  2015.0
+                ],
+                [
+                  -2.0,
+                  2015.0
+                ]
+              ]
+            },
+            {
+              "block_label": "text",
+              "block_content": "四、(50分)对于正20面体的30条棱分别用红、黄、蓝三色之一染色.问:有多少种染色方案,使得对于正20面体的20个侧面(三角形)恰有两条棱同色?",
+              "block_bbox": [
+                0,
+                2034,
+                1256,
+                2397
+              ],
+              "block_id": 7,
+              "block_order": 4,
+              "group_id": 7,
+              "block_polygon_points": [
+                [
+                  0.0,
+                  2034.0
+                ],
+                [
+                  1256.0,
+                  2034.0
+                ],
+                [
+                  1256.0,
+                  2397.0
+                ],
+                [
+                  0.0,
+                  2397.0
+                ]
+              ]
+            },
+            {
+              "block_label": "paragraph_title",
+              "block_content": "参考答案",
+              "block_bbox": [
+                376,
+                2431,
+                870,
+                2537
+              ],
+              "block_id": 8,
+              "block_order": 5,
+              "group_id": 8,
+              "block_polygon_points": [
+                [
+                  376.0,
+                  2431.0
+                ],
+                [
+                  870.0,
+                  2431.0
+                ],
+                [
+                  870.0,
+                  2537.0
+                ],
+                [
+                  376.0,
+                  2537.0
+                ]
+              ]
+            },
+            {
+              "block_label": "text",
+              "block_content": "第一试",
+              "block_bbox": [
+                456,
+                2554,
+                780,
+                2643
+              ],
+              "block_id": 9,
+              "block_order": 6,
+              "group_id": 9,
+              "block_polygon_points": [
+                [
+                  456.0,
+                  2554.0
+                ],
+                [
+                  780.0,
+                  2554.0
+                ],
+                [
+                  780.0,
+                  2643.0
+                ],
+                [
+                  456.0,
+                  2643.0
+                ]
+              ]
+            },
+            {
+              "block_label": "display_formula",
+              "block_content": " $$ \\begin{aligned}& 一、1.-ln2.\\\\&\\frac{\\displaystyle\\sum_{k=1}^{2\\ 020}ln\\frac{k}{k+1}}{\\prod_{k=2}^{2\\ 020}log_{k}(k+1)}\\\\&=\\frac{ln\\frac{1}{2}+ln\\frac{2}{3}+\\cdots+ln\\frac{2\\ 020}{2\\ 021}}{\\log_{2}3...<<truncated sha256:e7b3a22b56f1183e chars:464>>",
+              "block_bbox": [
+                19,
+                2695,
+                1039,
+                3748
+              ],
+              "block_id": 10,
+              "block_order": 7,
+              "group_id": 10,
+              "block_polygon_points": [
+                [
+                  19.0,
+                  2695.0
+                ],
+                [
+                  1039.0,
+                  2695.0
+                ],
+                [
+                  1039.0,
+                  3748.0
+                ],
+                [
+                  19.0,
+                  3748.0
+                ]
+              ]
+            },
+            {
+              "block_label": "text",
+              "block_content": "$$= \\frac { - \\ln 2 \\, 021 } { \\ln 2 \\ln 2 }$$\n\n$$= - \\ln 2 .$$\n\n2. $\\frac { 2 \\pi } { 3 }$.\n\n因为向量 $m$ 与 $n$ 共线，所以，\n$$\\frac { \\sin A } { \\sin C - \\sin B } = \\frac { b + c } { a + b }$$\n\n由正弦定理得\n$$\\frac...<<truncated sha256:ba70782a75514548 chars:1517>>",
+              "block_bbox": [
+                1452,
+                135,
+                2668,
+                3451
+              ],
+              "block_id": 11,
+              "block_order": 8,
+              "group_id": 11,
+              "block_polygon_points": [
+                [
+                  1452.0,
+                  135.0
+                ],
+                [
+                  2668.0,
+                  135.0
+                ],
+                [
+                  2668.0,
+                  3451.0
+                ],
+                [
+                  1452.0,
+                  3451.0
+                ]
+              ]
+            },
+            {
+              "block_label": "text",
+              "block_content": "每名成员用点表示,两成员从四种语言中选一种语言互相交流,即对应的两点用四色(红、黄、蓝、黑)线中的一色线相连.",
+              "block_bbox": [
+                1350,
+                3424,
+                2661,
+                3713
+              ],
+              "block_id": 12,
+              "block_order": 9,
+              "group_id": 12,
+              "block_polygon_points": [
+                [
+                  1350.0,
+                  3424.0
+                ],
+                [
+                  2661.0,
+                  3424.0
+                ],
+                [
+                  2661.0,
+                  3713.0
+                ],
+                [
+                  1350.0,
+                  3713.0
+                ]
+              ]
+            }
+          ],
+          "doc_preprocessor_res": {
+            "model_settings": {
+              "use_doc_orientation_classify": true,
+              "use_doc_unwarping": true
+            },
+            "angle": 0
+          },
+          "layout_det_res": {
+            "boxes": [
+              {
+                "cls_id": 16,
+                "label": "number",
+                "score": 0.3274378776550293,
+                "coordinate": [
+                  8,
+                  2,
+                  71,
+                  41
+                ],
+                "order": 1,
+                "polygon_points": [
+                  [
+                    8.0,
+                    2.0
+                  ],
+                  [
+                    71.0,
+                    2.0
+                  ],
+                  [
+                    71.0,
+                    41.0
+                  ],
+                  [
+                    8.0,
+                    41.0
+                  ]
+                ]
+              },
+              {
+                "cls_id": 12,
+                "label": "header",
+                "score": 0.8428677916526794,
+                "coordinate": [
+                  1795,
+                  10,
+                  2687,
+                  76
+                ],
+                "order": null,
+                "polygon_points": [
+                  [
+                    1795.0,
+                    10.0
+                  ],
+                  [
+                    2687.0,
+                    10.0
+                  ],
+                  [
+                    2687.0,
+                    76.0
+                  ],
+                  [
+                    1795.0,
+                    76.0
+                  ]
+                ]
+              },
+              {
+                "cls_id": 22,
+                "label": "text",
+                "score": 0.8833050727844238,
+                "coordinate": [
+                  0,
+                  110,
+                  1270,
+                  301
+                ],
+                "order": 2,
+                "polygon_points": [
+                  [
+                    0.0,
+                    110.0
+                  ],
+                  [
+                    1270.0,
+                    110.0
+                  ],
+                  [
+                    1270.0,
+                    301.0
+                  ],
+                  [
+                    0.0,
+                    301.0
+                  ]
+                ]
+              },
+              {
+                "cls_id": 15,
+                "label": "inline_formula",
+                "score": 0.7132636904716492,
+                "coordinate": [
+                  396,
+                  122,
+                  624,
+                  196
+                ],
+                "order": 3,
+                "polygon_points": [
+                  [
+                    396.0,
+                    122.0
+                  ],
+                  [
+                    624.0,
+                    122.0
+                  ],
+                  [
+                    624.0,
+                    196.0
+                  ],
+                  [
+                    396.0,
+                    196.0
+                  ]
+                ]
+              },
+              {
+                "cls_id": 15,
+                "label": "inline_formula",
+                "score": 0.7435078024864197,
+                "coordinate": [
+                  977,
+                  128,
+                  1184,
+                  200
+                ],
+                "order": 4,
+                "polygon_points": [
+                  [
+                    977.0,
+                    128.0
+                  ],
+                  [
+                    1184.0,
+                    128.0
+                  ],
+                  [
+                    1184.0,
+                    200.0
+                  ],
+                  [
+                    977.0,
+                    200.0
+                  ]
+                ]
+              },
+              {
+                "cls_id": 14,
+                "label": "image",
+                "score": 0.9372195601463318,
+                "coordinate": [
+                  117,
+                  359,
+                  1126,
+                  1065
+                ],
+                "order": null,
+                "polygon_points": [
+                  [
+                    117.0,
+                    359.0
+                  ],
+                  [
+                    1126.0,
+                    359.0
+                  ],
+                  [
+                    1126.0,
+                    1065.0
+                  ],
+                  [
+                    117.0,
+                    1065.0
+                  ]
+                ]
+              },
+              {
+                "cls_id": 7,
+                "label": "figure_title",
+                "score": 0.769015371799469,
+                "coordinate": [
+                  576,
+                  1128,
+                  671,
+                  1186
+                ],
+                "order": null,
+                "polygon_points": [
+                  [
+                    576.0,
+                    1128.0
+                  ],
+                  [
+                    671.0,
+                    1128.0
+                  ],
+                  [
+                    671.0,
+                    1186.0
+                  ],
+                  [
+                    576.0,
+                    1186.0
+                  ]
+                ]
+              },
+              {
+                "cls_id": 22,
+                "label": "text",
+                "score": 0.5647103190422058,
+                "coordinate": [
+                  5,
+                  1210,
+                  1258,
+                  1485
+                ],
+                "order": 5,
+                "polygon_points": [
+                  [
+                    5.0,
+                    1210.0
+                  ],
+                  [
+                    1258.0,
+                    1210.0
+                  ],
+                  [
+                    1258.0,
+                    1485.0
+                  ],
+                  [
+                    5.0,
+                    1485.0
+                  ]
+                ]
+              }
+            ],
+            "__boxes_total__": 39
+          }
+        },
+        "markdown": {
+          "text": "的中点. 证明:  $ \\triangle MPQ $ 的外接圆与  $ \\triangle NST $ 的外接圆的一个交点在 DE 上.\n\n<div style=\"text-align: center;\"><img src=\"imgs/img_in_image_box_117_359_1126_1065.jpg\" alt=\"Image\" width=\"37%\" /></div>\n\n\n<div s...<<truncated sha256:c063a7d8ec50431a chars:2656>>",
+          "images": {
+            "imgs/img_in_image_box_117_359_1126_1065.jpg": "<<redacted-resource:b8cb94a614b2e9a8>>"
+          }
+        },
+        "outputImages": {
+          "layout_det_res": "<<redacted-resource:3ed199ce52e2fb4e>>"
+        },
+        "inputImage": "<<redacted-resource:791745169219710b>>"
+      }
+    }
+  ]
+}

@@ -1,0 +1,656 @@
+{
+  "schema_version": "md-prework/paddle-capability-report/v1",
+  "sdk_result": {
+    "__type__": "object",
+    "__keys__": [
+      "job_id_present",
+      "page_count",
+      "data_info",
+      "pages"
+    ],
+    "job_id_present": {
+      "__type__": "bool"
+    },
+    "page_count": {
+      "__type__": "int"
+    },
+    "data_info": {
+      "__type__": "object",
+      "__keys__": [
+        "numPages",
+        "pages",
+        "type"
+      ],
+      "numPages": {
+        "__type__": "int"
+      },
+      "pages": {
+        "__type__": "array",
+        "__len__": 1,
+        "__item__": {
+          "__type__": "object",
+          "__keys__": [
+            "width",
+            "height"
+          ],
+          "width": {
+            "__type__": "int"
+          },
+          "height": {
+            "__type__": "int"
+          }
+        }
+      },
+      "type": {
+        "__type__": "str",
+        "__chars__": 3
+      }
+    },
+    "pages": {
+      "__type__": "array",
+      "__len__": 4,
+      "__item__": {
+        "__type__": "object",
+        "__keys__": [
+          "position",
+          "markdown_text",
+          "markdown_images",
+          "output_images",
+          "pruned_result",
+          "exports",
+          "input_image_url",
+          "raw"
+        ],
+        "position": {
+          "__type__": "int"
+        },
+        "markdown_text": {
+          "__type__": "str",
+          "__chars__": 1778
+        },
+        "markdown_images": {
+          "__type__": "object",
+          "__keys__": []
+        },
+        "output_images": {
+          "__type__": "object",
+          "__keys__": [
+            "layout_det_res"
+          ],
+          "layout_det_res": {
+            "__type__": "str",
+            "__chars__": 298
+          }
+        },
+        "pruned_result": {
+          "__type__": "object",
+          "__keys__": [
+            "page_count",
+            "width",
+            "height",
+            "model_settings",
+            "parsing_res_list",
+            "doc_preprocessor_res",
+            "layout_det_res"
+          ],
+          "page_count": {
+            "__type__": "null"
+          },
+          "width": {
+            "__type__": "int"
+          },
+          "height": {
+            "__type__": "int"
+          },
+          "model_settings": {
+            "__type__": "object",
+            "__keys__": [
+              "use_doc_preprocessor",
+              "use_layout_detection",
+              "use_chart_recognition",
+              "use_seal_recognition",
+              "use_ocr_for_image_block",
+              "format_block_content",
+              "merge_layout_blocks",
+              "markdown_ignore_labels",
+              "return_layout_polygon_points"
+            ],
+            "use_doc_preprocessor": {
+              "__type__": "bool",
+              "__truncated__": "depth"
+            },
+            "use_layout_detection": {
+              "__type__": "bool",
+              "__truncated__": "depth"
+            },
+            "use_chart_recognition": {
+              "__type__": "bool",
+              "__truncated__": "depth"
+            },
+            "use_seal_recognition": {
+              "__type__": "bool",
+              "__truncated__": "depth"
+            },
+            "use_ocr_for_image_block": {
+              "__type__": "bool",
+              "__truncated__": "depth"
+            },
+            "format_block_content": {
+              "__type__": "bool",
+              "__truncated__": "depth"
+            },
+            "merge_layout_blocks": {
+              "__type__": "bool",
+              "__truncated__": "depth"
+            },
+            "markdown_ignore_labels": {
+              "__type__": "array",
+              "__truncated__": "depth"
+            }
+          },
+          "parsing_res_list": {
+            "__type__": "array",
+            "__len__": 27,
+            "__item__": {
+              "__type__": "object",
+              "__truncated__": "depth"
+            }
+          },
+          "doc_preprocessor_res": {
+            "__type__": "object",
+            "__keys__": [
+              "model_settings",
+              "angle"
+            ],
+            "model_settings": {
+              "__type__": "object",
+              "__truncated__": "depth"
+            },
+            "angle": {
+              "__type__": "int",
+              "__truncated__": "depth"
+            }
+          },
+          "layout_det_res": {
+            "__type__": "object",
+            "__keys__": [
+              "boxes"
+            ],
+            "boxes": {
+              "__type__": "array",
+              "__truncated__": "depth"
+            }
+          }
+        },
+        "exports": {
+          "__type__": "object",
+          "__keys__": []
+        },
+        "input_image_url": {
+          "__type__": "str",
+          "__chars__": 293
+        },
+        "raw": {
+          "__type__": "object",
+          "__keys__": [
+            "prunedResult",
+            "markdown",
+            "outputImages",
+            "inputImage"
+          ],
+          "prunedResult": {
+            "__type__": "object",
+            "__keys__": [
+              "page_count",
+              "width",
+              "height",
+              "model_settings",
+              "parsing_res_list",
+              "doc_preprocessor_res",
+              "layout_det_res"
+            ],
+            "page_count": {
+              "__type__": "null",
+              "__truncated__": "depth"
+            },
+            "width": {
+              "__type__": "int",
+              "__truncated__": "depth"
+            },
+            "height": {
+              "__type__": "int",
+              "__truncated__": "depth"
+            },
+            "model_settings": {
+              "__type__": "object",
+              "__truncated__": "depth"
+            },
+            "parsing_res_list": {
+              "__type__": "array",
+              "__truncated__": "depth"
+            },
+            "doc_preprocessor_res": {
+              "__type__": "object",
+              "__truncated__": "depth"
+            },
+            "layout_det_res": {
+              "__type__": "object",
+              "__truncated__": "depth"
+            }
+          },
+          "markdown": {
+            "__type__": "object",
+            "__keys__": [
+              "text",
+              "images"
+            ],
+            "text": {
+              "__type__": "str",
+              "__truncated__": "depth"
+            },
+            "images": {
+              "__type__": "object",
+              "__truncated__": "depth"
+            }
+          },
+          "outputImages": {
+            "__type__": "object",
+            "__keys__": [
+              "layout_det_res"
+            ],
+            "layout_det_res": {
+              "__type__": "str",
+              "__truncated__": "depth"
+            }
+          },
+          "inputImage": {
+            "__type__": "str",
+            "__chars__": 293
+          }
+        }
+      }
+    }
+  },
+  "page_1_pruned_result": {
+    "__type__": "object",
+    "__keys__": [
+      "page_count",
+      "width",
+      "height",
+      "model_settings",
+      "parsing_res_list",
+      "doc_preprocessor_res",
+      "layout_det_res"
+    ],
+    "page_count": {
+      "__type__": "null"
+    },
+    "width": {
+      "__type__": "int"
+    },
+    "height": {
+      "__type__": "int"
+    },
+    "model_settings": {
+      "__type__": "object",
+      "__keys__": [
+        "use_doc_preprocessor",
+        "use_layout_detection",
+        "use_chart_recognition",
+        "use_seal_recognition",
+        "use_ocr_for_image_block",
+        "format_block_content",
+        "merge_layout_blocks",
+        "markdown_ignore_labels",
+        "return_layout_polygon_points"
+      ],
+      "use_doc_preprocessor": {
+        "__type__": "bool"
+      },
+      "use_layout_detection": {
+        "__type__": "bool"
+      },
+      "use_chart_recognition": {
+        "__type__": "bool"
+      },
+      "use_seal_recognition": {
+        "__type__": "bool"
+      },
+      "use_ocr_for_image_block": {
+        "__type__": "bool"
+      },
+      "format_block_content": {
+        "__type__": "bool"
+      },
+      "merge_layout_blocks": {
+        "__type__": "bool"
+      },
+      "markdown_ignore_labels": {
+        "__type__": "array",
+        "__len__": 7,
+        "__item__": {
+          "__type__": "str",
+          "__chars__": 6
+        }
+      }
+    },
+    "parsing_res_list": {
+      "__type__": "array",
+      "__len__": 27,
+      "__item__": {
+        "__type__": "object",
+        "__keys__": [
+          "block_label",
+          "block_content",
+          "block_bbox",
+          "block_id",
+          "block_order",
+          "group_id",
+          "block_polygon_points"
+        ],
+        "block_label": {
+          "__type__": "str",
+          "__chars__": 6
+        },
+        "block_content": {
+          "__type__": "str",
+          "__chars__": 80
+        },
+        "block_bbox": {
+          "__type__": "array",
+          "__len__": 4,
+          "__item__": {
+            "__type__": "int"
+          }
+        },
+        "block_id": {
+          "__type__": "int"
+        },
+        "block_order": {
+          "__type__": "null"
+        },
+        "group_id": {
+          "__type__": "int"
+        },
+        "block_polygon_points": {
+          "__type__": "array",
+          "__len__": 4,
+          "__item__": {
+            "__type__": "array",
+            "__len__": 2,
+            "__item__": {
+              "__type__": "float",
+              "__truncated__": "depth"
+            }
+          }
+        }
+      }
+    },
+    "doc_preprocessor_res": {
+      "__type__": "object",
+      "__keys__": [
+        "model_settings",
+        "angle"
+      ],
+      "model_settings": {
+        "__type__": "object",
+        "__keys__": [
+          "use_doc_orientation_classify",
+          "use_doc_unwarping"
+        ],
+        "use_doc_orientation_classify": {
+          "__type__": "bool"
+        },
+        "use_doc_unwarping": {
+          "__type__": "bool"
+        }
+      },
+      "angle": {
+        "__type__": "int"
+      }
+    },
+    "layout_det_res": {
+      "__type__": "object",
+      "__keys__": [
+        "boxes"
+      ],
+      "boxes": {
+        "__type__": "array",
+        "__len__": 53,
+        "__item__": {
+          "__type__": "object",
+          "__keys__": [
+            "cls_id",
+            "label",
+            "score",
+            "coordinate",
+            "order",
+            "polygon_points"
+          ],
+          "cls_id": {
+            "__type__": "int"
+          },
+          "label": {
+            "__type__": "str",
+            "__chars__": 6
+          },
+          "score": {
+            "__type__": "float"
+          },
+          "coordinate": {
+            "__type__": "array",
+            "__len__": 4,
+            "__item__": {
+              "__type__": "int",
+              "__truncated__": "depth"
+            }
+          },
+          "order": {
+            "__type__": "null"
+          },
+          "polygon_points": {
+            "__type__": "array",
+            "__len__": 4,
+            "__item__": {
+              "__type__": "array",
+              "__truncated__": "depth"
+            }
+          }
+        }
+      }
+    }
+  },
+  "page_1_raw": {
+    "__type__": "object",
+    "__keys__": [
+      "prunedResult",
+      "markdown",
+      "outputImages",
+      "inputImage"
+    ],
+    "prunedResult": {
+      "__type__": "object",
+      "__keys__": [
+        "page_count",
+        "width",
+        "height",
+        "model_settings",
+        "parsing_res_list",
+        "doc_preprocessor_res",
+        "layout_det_res"
+      ],
+      "page_count": {
+        "__type__": "null"
+      },
+      "width": {
+        "__type__": "int"
+      },
+      "height": {
+        "__type__": "int"
+      },
+      "model_settings": {
+        "__type__": "object",
+        "__keys__": [
+          "use_doc_preprocessor",
+          "use_layout_detection",
+          "use_chart_recognition",
+          "use_seal_recognition",
+          "use_ocr_for_image_block",
+          "format_block_content",
+          "merge_layout_blocks",
+          "markdown_ignore_labels",
+          "return_layout_polygon_points"
+        ],
+        "use_doc_preprocessor": {
+          "__type__": "bool"
+        },
+        "use_layout_detection": {
+          "__type__": "bool"
+        },
+        "use_chart_recognition": {
+          "__type__": "bool"
+        },
+        "use_seal_recognition": {
+          "__type__": "bool"
+        },
+        "use_ocr_for_image_block": {
+          "__type__": "bool"
+        },
+        "format_block_content": {
+          "__type__": "bool"
+        },
+        "merge_layout_blocks": {
+          "__type__": "bool"
+        },
+        "markdown_ignore_labels": {
+          "__type__": "array",
+          "__len__": 7,
+          "__item__": {
+            "__type__": "str",
+            "__truncated__": "depth"
+          }
+        }
+      },
+      "parsing_res_list": {
+        "__type__": "array",
+        "__len__": 27,
+        "__item__": {
+          "__type__": "object",
+          "__keys__": [
+            "block_label",
+            "block_content",
+            "block_bbox",
+            "block_id",
+            "block_order",
+            "group_id",
+            "block_polygon_points"
+          ],
+          "block_label": {
+            "__type__": "str",
+            "__truncated__": "depth"
+          },
+          "block_content": {
+            "__type__": "str",
+            "__truncated__": "depth"
+          },
+          "block_bbox": {
+            "__type__": "array",
+            "__truncated__": "depth"
+          },
+          "block_id": {
+            "__type__": "int",
+            "__truncated__": "depth"
+          },
+          "block_order": {
+            "__type__": "null",
+            "__truncated__": "depth"
+          },
+          "group_id": {
+            "__type__": "int",
+            "__truncated__": "depth"
+          },
+          "block_polygon_points": {
+            "__type__": "array",
+            "__truncated__": "depth"
+          }
+        }
+      },
+      "doc_preprocessor_res": {
+        "__type__": "object",
+        "__keys__": [
+          "model_settings",
+          "angle"
+        ],
+        "model_settings": {
+          "__type__": "object",
+          "__keys__": [
+            "use_doc_orientation_classify",
+            "use_doc_unwarping"
+          ],
+          "use_doc_orientation_classify": {
+            "__type__": "bool",
+            "__truncated__": "depth"
+          },
+          "use_doc_unwarping": {
+            "__type__": "bool",
+            "__truncated__": "depth"
+          }
+        },
+        "angle": {
+          "__type__": "int"
+        }
+      },
+      "layout_det_res": {
+        "__type__": "object",
+        "__keys__": [
+          "boxes"
+        ],
+        "boxes": {
+          "__type__": "array",
+          "__len__": 53,
+          "__item__": {
+            "__type__": "object",
+            "__truncated__": "depth"
+          }
+        }
+      }
+    },
+    "markdown": {
+      "__type__": "object",
+      "__keys__": [
+        "text",
+        "images"
+      ],
+      "text": {
+        "__type__": "str",
+        "__chars__": 1778
+      },
+      "images": {
+        "__type__": "object",
+        "__keys__": []
+      }
+    },
+    "outputImages": {
+      "__type__": "object",
+      "__keys__": [
+        "layout_det_res"
+      ],
+      "layout_det_res": {
+        "__type__": "str",
+        "__chars__": 298
+      }
+    },
+    "inputImage": {
+      "__type__": "str",
+      "__chars__": 293
+    }
+  },
+  "job_envelope_keys": [
+    "dataInfo",
+    "dataInfo.numPages",
+    "dataInfo.pages",
+    "dataInfo.type",
+    "layoutParsingResults",
+    "preprocessedImages"
+  ]
+}

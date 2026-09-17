@@ -1,0 +1,158 @@
+{
+  "schema_version": "md-prework/paddle-capability-report/v1",
+  "source": {
+    "tool": "paddleocr-vl-md/tools/probe_paddle_capabilities.py",
+    "model": "PaddleOCR-VL-1.6",
+    "page_ranges": "1-4",
+    "input_name": "paper-01_book-1-7_pdf-6-12.pdf",
+    "token_source": "进程环境变量 PADDLEOCR_API_KEY",
+    "mode": "live",
+    "note": "final live run: single command produced both report and fixture"
+  },
+  "markdown": true,
+  "images_mapping": true,
+  "page_results": true,
+  "blocks": true,
+  "block_id": true,
+  "block_order": true,
+  "block_label": true,
+  "block_bbox": true,
+  "block_content": true,
+  "raw_provider_response_accessible": true,
+  "page_count": 4,
+  "page_index": true,
+  "page_index_source": "page_position",
+  "layout_parsing_results": true,
+  "job_envelope_keys": [
+    "dataInfo",
+    "dataInfo.numPages",
+    "dataInfo.pages",
+    "dataInfo.type",
+    "layoutParsingResults",
+    "preprocessedImages"
+  ],
+  "job_envelope": {
+    "line_count": 4,
+    "line_keys": [
+      "errorCode",
+      "errorMsg",
+      "logId",
+      "result"
+    ],
+    "result_keys": [
+      "dataInfo",
+      "layoutParsingResults",
+      "preprocessedImages"
+    ],
+    "data_info_keys": [
+      "numPages",
+      "pages",
+      "type"
+    ],
+    "data_info_sample": {
+      "numPages": 1,
+      "page_size_keys": [
+        "height",
+        "width"
+      ],
+      "type": "pdf"
+    },
+    "layout_parsing_results_per_line": [
+      1,
+      1,
+      1,
+      1
+    ]
+  },
+  "pruned_result": true,
+  "output_images": true,
+  "exports": false,
+  "input_image_url": true,
+  "block_count_page1": 27,
+  "block_count_total": 72,
+  "block_keys": [
+    "block_bbox",
+    "block_content",
+    "block_id",
+    "block_label",
+    "block_order",
+    "block_polygon_points",
+    "group_id"
+  ],
+  "block_order_non_null": 58,
+  "block_order_null_ratio": 0.1944,
+  "block_label_histogram": {
+    "text": 45,
+    "display_formula": 7,
+    "paragraph_title": 5,
+    "figure_title": 4,
+    "header": 4,
+    "image": 3,
+    "number": 2,
+    "chart": 1,
+    "doc_title": 1
+  },
+  "block_group_id_present": true,
+  "block_polygon_points_present": true,
+  "layout_det_boxes_total": 202,
+  "images_pages": [
+    {
+      "position": 1,
+      "count": 1,
+      "kinds": [
+        "url"
+      ]
+    },
+    {
+      "position": 2,
+      "count": 1,
+      "kinds": [
+        "url"
+      ]
+    },
+    {
+      "position": 3,
+      "count": 2,
+      "kinds": [
+        "url"
+      ]
+    }
+  ],
+  "images_kind": [
+    "url"
+  ],
+  "wrapper_result_fields": [
+    "markdown",
+    "pages",
+    "images_mapping"
+  ],
+  "wrapper_exposes_blocks": false,
+  "gap_classification": "B",
+  "observed_page_keys": [
+    "exports",
+    "input_image_url",
+    "markdown_images",
+    "markdown_text",
+    "output_images",
+    "position",
+    "pruned_result",
+    "raw"
+  ],
+  "observed_raw_keys": [
+    "inputImage",
+    "markdown",
+    "outputImages",
+    "prunedResult"
+  ],
+  "observed_pruned_keys": [
+    "doc_preprocessor_res",
+    "height",
+    "layout_det_res",
+    "model_settings",
+    "page_count",
+    "parsing_res_list",
+    "width"
+  ],
+  "page_index_note": "每行 JSONL 对应一个 layoutParsingResults 条目（dataInfo.numPages=1），页码只能由行序/页序推导，响应里没有显式 pageIndex 字段。",
+  "input_sha256_hint": "45ad7e1382c0d570"
+}
