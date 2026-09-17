@@ -8,16 +8,62 @@
 
 | 文件 | 说明 |
 | --- | --- |
-| `pdf2md.py` | PDF → Markdown 主程序 |
+| `ocr_producer.py` | **唯一 producer 核心**：调 PaddleOCR-VL、保存结构化证据、下载并校验图片、远端压力重试 |
+| `prework_ocr.py` | **编排入口**（推荐）：`convert` / `batch`、`--output-dir`、`--stdout`、`ocr_status.jsonl` / `ocr_summary.json` |
+| `pdf2md.py` | 人用前端（兼容旧用法）：位置参数、产物写在 PDF 同目录；逻辑全部委托给 `ocr_producer.py` |
 | `ocr_mark.py` | 只标记可疑行（页眉残片、标题异常），**不修改文件** |
 | `run_pipeline.py` | 单文件全流程：OCR → 规范化 → 复检 → 标记 |
 | `run_pipeline_parallel.py` | **多 PDF 受限并发 + 自适应限流**：每个 PDF 一个独立子进程 |
 | `remote_pressure.py` | 远端错误分类（背压 / 额度耗尽 / OCR 失败 / 环境错误），纯函数 |
+| `tools/` + `capability/` | PaddleOCR-VL 结构化返回的能力探测、报告与脱敏 fixture（见 `capability/README.md`） |
 | `运行全流程.cmd` | **拖拽入口**：把文件/文件夹直接拖上去即可（串行） |
 | `pdf2md.cmd` | 只跑 OCR 的包装脚本 |
 | `requirements.txt` | 唯一依赖 `paddleocr-mcp>=0.8.5`（不装 paddlepaddle） |
 | `.venv/` | 独立虚拟环境 |
-| `tests/` | 调度器 / 限流 / 冷却恢复自动测试（96 项，假 worker + 虚拟时钟，不触碰远端） |
+| `tests/` | 调度器 / 限流 / 冷却恢复 / 证据与图片校验自动测试（假 worker 与假客户端，不触碰远端） |
+
+## 唯一 producer：OCR → 结构化证据
+
+两套历史 producer 已合并成一份实现（`ocr_producer.py`），入口是 `prework_ocr.py`：
+
+```powershell
+# 单份：证据 + Markdown + 图片都写进受控目录
+.\.venv\Scripts\python.exe prework_ocr.py convert `
+  --input .\pdfs\paper.pdf --output-dir .\out\run-1 --keep-images
+
+# 批量：额外写 ocr_status.jsonl；--jobs N 复用调度器的自适应冷却
+.\.venv\Scripts\python.exe prework_ocr.py batch `
+  --pdf-dir .\pdfs --output-dir .\out\run-1 --jobs 2
+
+# 被编排调用：Markdown 走 stdout，进度与警告走 stderr（只允许单个输入）
+.\.venv\Scripts\python.exe prework_ocr.py convert `
+  --input .\pdfs\paper.pdf --output-dir .\out\run-1 --stdout
+```
+
+产物：
+
+```text
+<output-dir>/
+  <stem>.md               # Markdown 视图（图片 src 已改成本地相对路径）
+  <stem>.evidence.json    # 不可变结构化证据（md-prework/ocr-evidence/v1）
+  <stem>_raw/page-0001.json   # 每页原始 prunedResult，逐字节保留
+  <stem>_media/           # 图片按文件头校验后落盘
+  ocr_status.jsonl        # batch 模式：每份一行状态
+  ocr_summary.json        # 每次运行：汇总（含每份 pages/blocks/images/失败原因）
+```
+
+证据里保存的是 Paddle 真正给出的块级结构（见 `capability/README.md` 的实跑证据）：
+`block_id` / `block_order` / `block_label` / `block_content` / `block_bbox` /
+`block_polygon_points` / `group_id`，另加 producer 派生的 `reading_order`
+（以块列表顺序为准，因为实测 `block_order` 有约 15%–19% 为 null）。
+
+三条不变量：
+
+1. **证据不可变**：`<stem>.evidence.json` 已存在时默认拒绝重跑（`--overwrite` 才覆盖），
+   规范化、切题等任何派生结果都不得回写证据；
+2. **不伪造图片**：下载失败或文件头不认识时只登记 `state=missing` 并警告，
+   绝不把 Markdown 指向不存在的本地路径；
+3. **不越界**：producer 不切题、不调 LLM、不写题库、不建索引。
 
 完整的工程流程与规则顺序见同级规范化器项目的 [`../md-math-normalizer/docs/全流程设计文档.md`](../md-math-normalizer/docs/全流程设计文档.md)，
 技术细节与实测数据见 [`../md-math-normalizer/docs/技术报告.md`](../md-math-normalizer/docs/技术报告.md)。

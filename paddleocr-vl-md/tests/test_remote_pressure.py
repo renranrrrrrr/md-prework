@@ -112,7 +112,24 @@ def test_retryable_helper_covers_429_and_503():
 
 
 def test_classifier_is_shared_single_source_of_truth():
-    """pdf2md 必须复用同一份分类逻辑，不得自己再维护一套关键词表。"""
-    source = (TOOL_DIR / "pdf2md.py").read_text(encoding="utf-8")
-    assert "remote_pressure" in source, "pdf2md.py 应复用 remote_pressure 的分类"
-    assert "_RATE_LIMIT_HINTS" not in source, "旧的模糊关键词表应已移除"
+    """分类逻辑只有一份：OCR 核心复用 remote_pressure，前端不得再维护关键词表。
+
+    合并两套 producer 之后，唯一的 OCR 实现是 ``ocr_producer.py``；
+    ``pdf2md.py`` / ``prework_ocr.py`` 只是 CLI 前端，必须委托给它。
+    """
+
+    core = (TOOL_DIR / "ocr_producer.py").read_text(encoding="utf-8")
+    assert "remote_pressure" in core, "ocr_producer.py 应复用 remote_pressure 的分类"
+
+    prework = (TOOL_DIR / "prework_ocr.py").read_text(encoding="utf-8")
+    assert "ocr_producer" in prework, "prework_ocr.py 必须委托给唯一的核心实现"
+
+    legacy = (TOOL_DIR / "pdf2md.py").read_text(encoding="utf-8")
+    assert "ocr_producer" in legacy, "pdf2md.py 必须委托给唯一的核心实现"
+
+    for module in ("ocr_producer.py", "prework_ocr.py", "pdf2md.py"):
+        source = (TOOL_DIR / module).read_text(encoding="utf-8")
+        assert "_RATE_LIMIT_HINTS" not in source, f"{module} 不应再维护模糊关键词表"
+        # 关键词表只能出现在 remote_pressure.py 里
+        assert "任务提交队列已满" not in source, f"{module} 不应复制远端压力关键词表"
+        assert "今日提交任务已达上限" not in source, f"{module} 不应复制额度耗尽关键词表"
