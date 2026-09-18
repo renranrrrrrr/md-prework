@@ -27,7 +27,11 @@ _CHINESE_RE = re.compile(r"^\s*(?P<number>[一二三四五六七八九十]{1,3})
 
 
 def _mentions_ref(line: str, ref: str) -> bool:
-    """诊断里是否点名了该 ``block_ref``（按 ``:`` 分段匹配，不做子串碰运气）。"""
+    """诊断里是否点名了该 ``block_ref``。
+
+    只看紧邻字符：``ref`` 必须位于串首/串尾，或左右以 ``:`` 分隔。
+    取"剩余整串"当右边界会把 ``unresolved_split:p0000:b0011:not_found`` 判成没点名。
+    """
 
     cursor = 0
     while True:
@@ -35,7 +39,8 @@ def _mentions_ref(line: str, ref: str) -> bool:
         if found < 0:
             return False
         before = line[found - 1] if found else ""
-        after = line[found + len(ref) :] or ""
+        tail = found + len(ref)
+        after = line[tail] if tail < len(line) else ""
         if before in {"", ":"} and after in {"", ":"}:
             return True
         cursor = found + 1
@@ -189,30 +194,35 @@ def assemble(
         if split.get("status") != "resolved":
             diagnostics.append(f"unresolved_split:{ref}:{split.get('status')}")
             continue
-        start, end = int(split["start"]), int(split["end"])
+        start = int(split["start"])
         applied = False
         # 快照后遍历：下面会往 candidates 里追加，边遍历边追加会让新候选被自己再切一次
         for candidate in list(candidates):
             for index, item in enumerate(candidate.statement_refs):
-                if item["block_ref"] == ref and item["start"] == 0:
-                    block_len = item["end"]
-                    # anchor 标记新题开始：前半段留给当前 candidate，后半段开新 candidate
-                    candidate.statement_refs[index] = {"block_ref": ref, "start": 0, "end": start}
-                    tail = candidate.statement_refs[index + 1 :]
-                    candidate.statement_refs = candidate.statement_refs[: index + 1]
-                    new_candidate = Candidate(candidate_id=f"pc{len(candidates) + 1:04d}")
-                    new_candidate.statement_refs = [
-                        {"block_ref": ref, "start": start, "end": block_len},
-                        *tail,
-                    ]
-                    new_candidate.solution_refs = list(candidate.solution_refs)
-                    candidates.append(new_candidate)
-                    applied = True
-                    break
+                if item["block_ref"] != ref or item["start"] != 0:
+                    continue
+                block_len = int(item["end"])
+                # 只有 0 < start < block_len 才是"块内第二题"：start==0 意味着整块本就
+                # 从新题开头（切出来是 [0,0) 的零长度引用），start>=block_len 是越界 anchor。
+                if not 0 < start < block_len:
+                    continue
+                # anchor 标记新题开始：前半段留给当前 candidate，后半段开新 candidate
+                candidate.statement_refs[index] = {"block_ref": ref, "start": 0, "end": start}
+                tail = candidate.statement_refs[index + 1 :]
+                candidate.statement_refs = candidate.statement_refs[: index + 1]
+                new_candidate = Candidate(candidate_id=f"pc{len(candidates) + 1:04d}")
+                new_candidate.statement_refs = [
+                    {"block_ref": ref, "start": start, "end": block_len},
+                    *tail,
+                ]
+                new_candidate.solution_refs = list(candidate.solution_refs)
+                candidates.append(new_candidate)
+                applied = True
+                break
         if not applied:
             # 模型给的 anchor 在原文唯一且解析成功，但该块没有可切的题面区间
-            # （例如被判定为 SOLUTION_*/SHARED_CONTEXT/NON_PROBLEM，或引用了不存在的块）。
-            # 只记可观测性，不改变候选结构，也不回退 split 判定。
+            # （被判定为 SOLUTION_*/SHARED_CONTEXT/NON_PROBLEM、引用了不存在的块，
+            # 或 anchor 落在块首/越界）。只记可观测性，不改变候选结构，也不回退 split 判定。
             diagnostics.append(f"split_not_applied:{ref}")
 
     return {

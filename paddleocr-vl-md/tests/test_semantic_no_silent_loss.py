@@ -171,6 +171,53 @@ def test_helper_does_not_accept_prefix_collisions() -> None:
     assert sa.unaccounted_blocks(_blocks(["p0000:b001"]), result) == []
 
 
+#: 诊断字符串的四种真实形状：ref 后面可能还跟着 ``:status``，右边界是紧邻字符。
+NAMED = "p0000:b0011"
+DIAGNOSTIC_SHAPES = (
+    f"orphan_solution:{NAMED}",
+    f"unresolved_split:{NAMED}:not_found",
+    f"unresolved_split:{NAMED}:ambiguous",
+    f"split_not_applied:{NAMED}",
+)
+
+
+def test_diagnostic_with_a_suffix_still_names_the_block() -> None:
+    """``unresolved_split:<ref>:not_found`` 必须算点名该 ``<ref>``（曾经的右边界 bug）。"""
+
+    for line in DIAGNOSTIC_SHAPES:
+        result = {"candidates": [], "excluded": [], "diagnostics": [line]}
+        assert sa.unaccounted_blocks(_blocks([NAMED]), result) == [], line
+
+
+def test_diagnostic_never_names_a_longer_or_shorter_ref() -> None:
+    """同一行里多一位或少一位都算没点名：不许用子串碰运气把丢块洗白。"""
+
+    for line in DIAGNOSTIC_SHAPES:
+        result = {"candidates": [], "excluded": [], "diagnostics": [line]}
+        for other in ("p0000:b001", "p0000:b00111", "p0000:b01"):
+            assert sa.unaccounted_blocks(_blocks([other]), result) == [other], (line, other)
+
+
+def test_the_accounting_literals_are_what_assembler_emits() -> None:
+    """上面的字面量必须是 assembler 真会产出的形状，否则测的是字符串而不是行为。"""
+
+    blocks = _blocks([NAMED])
+    emitted: set[str] = set()
+    for status in ("not_found", "ambiguous"):
+        split = {"status": status} if status == "not_found" else {"status": status, "candidates": [0, 3]}
+        result = sa.assemble(
+            blocks, {"roles": {NAMED: "SOLUTION_START"}}, splits={NAMED: split}
+        )
+        emitted.update(result["diagnostics"])
+    resolved = sa.assemble(
+        blocks, {"roles": {NAMED: "SOLUTION_START"}}, splits={NAMED: {"status": "resolved", "start": 1, "end": 3}}
+    )
+    emitted.update(resolved["diagnostics"])
+    for line in DIAGNOSTIC_SHAPES:
+        assert line in emitted, f"{line} 不是 assembler 真实产出的诊断，记账测试失效"
+    assert sa.unaccounted_blocks(blocks, resolved) == []
+
+
 def test_helper_counts_all_three_channels() -> None:
     blocks = _blocks(["p0000:b0000", "p0000:b0001", "p0000:b0002", "p0000:b0003"])
     result = {

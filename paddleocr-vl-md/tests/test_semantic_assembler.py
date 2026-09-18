@@ -94,8 +94,8 @@ def test_assembly_is_deterministic() -> None:
 def test_resolved_split_on_solution_block_is_reported_as_not_applied() -> None:
     blocks = _blocks()
     reconciled = {"roles": {"b3": "SOLUTION_START", "b4": "SOLUTION_CONTINUATION"}}
-    split = sa.resolve_split("解析内容 2. 附加题", "2. 附加题")
-    assert split["status"] == "resolved"
+    split = sa.resolve_split("解析内容 2. 附加题", "内容")
+    assert split["status"] == "resolved" and 0 < split["start"] < len("解析内容")
 
     applied_to = sa.assemble(blocks, reconciled, splits={"b4": split})
     assert "split_not_applied:b4" in applied_to["diagnostics"]
@@ -115,13 +115,70 @@ def test_resolved_split_on_shared_or_non_problem_block_is_reported() -> None:
 
 
 def test_applied_split_does_not_emit_not_applied() -> None:
+    text = "1. 一 2. 二"
     result = sa.assemble(
-        [{"block_ref": "b0", "raw_text": "1. 一 2. 二"}],
+        [{"block_ref": "b0", "raw_text": text}],
         {"roles": {"b0": "PROBLEM_START"}},
-        splits={"b0": sa.resolve_split("1. 一 2. 二", "2. 二")},
+        splits={"b0": sa.resolve_split(text, "2. 二")},
     )
     assert result["candidate_count"] == 2
     assert not any(item.startswith("split_not_applied") for item in result["diagnostics"])
+    assert _ranges(result) == [
+        {"block_ref": "b0", "start": 0, "end": 5},
+        {"block_ref": "b0", "start": 5, "end": len(text)},
+    ]
+
+
+# —— anchor 落在块首/越界的 resolved split 不许物化 ——
+
+
+def _ranges(result: dict) -> list[dict]:
+    return [
+        item
+        for candidate in result["candidates"]
+        for item in candidate["statement_refs"] + candidate["solution_refs"]
+    ]
+
+
+def test_split_anchor_at_block_head_is_not_materialised() -> None:
+    """start == 0 意味着整块本就从新题开头，切出来会是 [0, 0) 的零长度引用。"""
+
+    blocks = [{"block_ref": "b0", "raw_text": "2. 第二题"}]
+    reconciled = {"roles": {"b0": "PROBLEM_START"}}
+    split = sa.resolve_split("2. 第二题", "2. 第二题")
+    assert split["status"] == "resolved" and split["start"] == 0
+
+    baseline = sa.assemble(blocks, reconciled)
+    result = sa.assemble(blocks, reconciled, splits={"b0": split})
+    assert result["candidates"] == baseline["candidates"], "块首 anchor 不许改动候选"
+    assert result["candidate_count"] == baseline["candidate_count"]
+    assert "split_not_applied:b0" in result["diagnostics"]
+    assert all(item["start"] < item["end"] for item in _ranges(result))
+
+
+def test_split_anchor_beyond_block_end_is_not_materialised() -> None:
+    blocks = [{"block_ref": "b0", "raw_text": "1. 一题"}]
+    reconciled = {"roles": {"b0": "PROBLEM_START"}}
+    baseline = sa.assemble(blocks, reconciled)
+    out_of_range = {"status": "resolved", "start": len("1. 一题"), "end": len("1. 一题") + 2}
+
+    result = sa.assemble(blocks, reconciled, splits={"b0": out_of_range})
+    assert result["candidates"] == baseline["candidates"]
+    assert "split_not_applied:b0" in result["diagnostics"]
+
+
+def test_mid_anchor_still_splits_into_two_non_empty_ranges() -> None:
+    """保住正常路径：中间 anchor 仍然切成前后两段，且都不为空。"""
+
+    text = "1. 一题 2. 二题"
+    result = sa.assemble(
+        [{"block_ref": "b0", "raw_text": text}],
+        {"roles": {"b0": "PROBLEM_START"}},
+        splits={"b0": sa.resolve_split(text, "2. 二题")},
+    )
+    assert result["candidate_count"] == 2
+    assert all(item["start"] < item["end"] for item in _ranges(result)), _ranges(result)
+    assert sa.unaccounted_blocks([{"block_ref": "b0", "raw_text": text}], result) == []
 
 
 def test_unresolved_split_keeps_its_own_diagnostic() -> None:
