@@ -161,7 +161,8 @@ def count_standalone_numeric_wraps(raw: str, normalized: str) -> int:
 
 
 QUOTA = {
-    "HIGH_RISK": 15,
+    # GPT 的抽样口径：剩余 high-risk > 100 时抽 30–50 个。
+    "HIGH_RISK": 30,
     "WRAP_MATH_ONLY": 10,
     "MIXED": 10,
     "PUNCTUATION_ONLY": 10,
