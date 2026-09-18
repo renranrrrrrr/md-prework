@@ -1,6 +1,6 @@
 # md-prework 交接文档
 
-> 最后更新：2026-09-18 ｜ 交接版本：main @ `1f7901e`（milestone tag `prework-semantic-foundation-v1` → `cf13a1c`）
+> 最后更新：2026-09-18 ｜ 交接版本：**main @ `b2f23ca`**（本文档所在提交；上一个功能提交 `1f7901e`，milestone tag `prework-semantic-foundation-v1` → `cf13a1c`）
 > 适用读者：接手本仓库继续开发的工程师（假定熟悉 Python / pytest / 命令行，不假定了解历史决策）
 
 ---
