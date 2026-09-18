@@ -8,7 +8,9 @@ reconcile），所以"某个 split 没落地"既可能是模型判错角色，�
 口径（对每个 ``status == resolved`` 的 split）：
 
 * ``source_role``：**第一个**提案窗口里该块的角色（first-one-wins 的那个窗口）；
-* ``proposers``：所有提出过该块 split 的窗口（窗口内角色 + anchor）；
+* ``proposers``：按归档窗口顺序列出的**每一条** split 提案（窗口 + 窗口内角色 + anchor）；
+  同一窗口可以对同一块提多条，所以 ``proposer_count``（提案数）与
+  ``proposer_window_count``（不同窗口数）是两个数，分开统计不要混；
 * ``covering_windows``：所有覆盖该块的 overlap 窗口及其角色；
 * ``final_role``：默认读**归档**的 ``reconciled``（冻结语义），``--recompute-reconcile`` 才重算；
 * ``outcome`` / ``placement``：用当前 correctness 版 assembler 离线重放得到。
@@ -147,6 +149,8 @@ def audit_run(path: pathlib.Path, *, recompute_reconcile: bool = False) -> dict[
                 "role_conflict": ref in role_conflicts,
                 "conflict_roles": list(role_conflicts.get(ref) or []),
                 "proposer_count": len(texts),
+                # 提案次数 ≠ 提案窗口数：同一个窗口可以对同一块列出多条 split
+                "proposer_window_count": len({item["window_id"] for item in texts}),
                 "distinct_anchors": len({item["anchor"] for item in texts}),
                 "outcome": "not_applied" if ref in not_applied else "applied",
                 "placement": _placement(ref, assembled, blocks),
@@ -189,6 +193,7 @@ def summarize(runs: list[dict[str, Any]]) -> dict[str, Any]:
     applied = [e for e in entries if e["outcome"] == "applied"]
     not_applied = [e for e in entries if e["outcome"] == "not_applied"]
     multi = [e for e in entries if e["proposer_count"] > 1]
+    multi_window = [e for e in entries if e["proposer_window_count"] > 1]
     return {
         "runs": len(runs),
         "reconcile_source": runs[0]["reconcile_source"] if runs else "",
@@ -207,9 +212,11 @@ def summarize(runs: list[dict[str, Any]]) -> dict[str, Any]:
         ),
         "not_applied_source_solution": sum(1 for e in not_applied if e["source_role"] in SOLUTION_ROLES),
         "not_applied_source_uncertain": sum(1 for e in not_applied if e["source_role"] == "UNCERTAIN"),
-        "multi_proposer_blocks": len(multi),
-        "multi_proposer_conflicting_anchor": sum(1 for e in multi if e["distinct_anchors"] > 1),
-        "multi_proposer_same_anchor": sum(1 for e in multi if e["distinct_anchors"] == 1),
+        "multi_proposal_blocks": len(multi),
+        "multi_proposal_conflicting_anchor": sum(1 for e in multi if e["distinct_anchors"] > 1),
+        "multi_proposal_same_anchor": sum(1 for e in multi if e["distinct_anchors"] == 1),
+        "multi_window_proposal_blocks": len(multi_window),
+        "single_window_multi_proposal_blocks": len(multi) - len(multi_window),
         "role_conflict_splits": sum(1 for e in entries if e["role_conflict"]),
         "no_role_conflict_but_not_applied": sum(
             1 for e in not_applied if not e["role_conflict"]
@@ -234,7 +241,7 @@ def _categories(entries: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]
     categories: dict[str, list[dict[str, Any]]] = {"applied": []}
     for role in ALL_ROLES:
         categories[f"not_applied_source={role}"] = []
-    categories["multi_proposer"] = []
+    categories["multi_proposal"] = []
     categories["role_conflict_not_applied"] = []
     for entry in entries:
         if entry["outcome"] == "applied":
@@ -245,7 +252,7 @@ def _categories(entries: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]
             if entry["role_conflict"]:
                 categories["role_conflict_not_applied"].append(entry)
         if entry["proposer_count"] > 1:
-            categories["multi_proposer"].append(entry)
+            categories["multi_proposal"].append(entry)
     return {name: items for name, items in categories.items() if items}
 
 
@@ -276,9 +283,11 @@ def render_markdown(runs: list[dict[str, Any]], totals: dict[str, Any], *, sampl
         ),
         ("not_applied_source_solution", "not_applied：source 本就是 SOLUTION_*"),
         ("not_applied_source_uncertain", "not_applied：source 本就是 UNCERTAIN"),
-        ("multi_proposer_blocks", "同一块被多个窗口提出 split"),
-        ("multi_proposer_conflicting_anchor", "└ 其中 anchor 不一致"),
-        ("multi_proposer_same_anchor", "└ 其中 anchor 完全一致"),
+        ("multi_proposal_blocks", "同一块被提出多条 split（提案数 > 1）"),
+        ("multi_proposal_conflicting_anchor", "└ 其中 anchor 不一致"),
+        ("multi_proposal_same_anchor", "└ 其中 anchor 完全一致"),
+        ("multi_window_proposal_blocks", "└ 其中来自 ≥2 个不同窗口"),
+        ("single_window_multi_proposal_blocks", "└ 其中全部来自同一个窗口"),
         ("role_conflict_splits", "存在 role conflict 的 resolved split"),
         ("no_role_conflict_but_not_applied", "无 role conflict 但仍 not_applied"),
         ("anchor_reproduces_archived_range", "winner anchor 可复现归档 start/end（自检）"),
@@ -321,7 +330,8 @@ def render_markdown(runs: list[dict[str, Any]], totals: dict[str, Any], *, sampl
                 f"  - raw_text：{entry['raw_text']}",
                 f"  - 最终区间：[{entry['start']}, {entry['end']})；anchor：{entry['anchor']!r}",
                 f"  - 第一提案窗口：{entry['first_proposer_window']} role={entry['source_role']}",
-                "  - 全部提案窗口："
+                f"  - 提案次数 / 提案窗口数：{entry['proposer_count']} / {entry['proposer_window_count']}",
+                "  - 全部提案（窗口 role 与 anchor，按归档窗口顺序）："
                 + "、".join(f"{p['window_id']}({p['role']})={p['anchor']!r}" for p in entry["proposers"]),
                 "  - 覆盖该块的所有窗口："
                 + "、".join(f"{w['window_id']}({w['role']})" for w in entry["covering_windows"]),

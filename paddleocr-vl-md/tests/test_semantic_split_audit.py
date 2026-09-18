@@ -80,6 +80,8 @@ def _payload() -> dict:
                 [
                     ("p0000:b0001", "2. 乙题"),  # 块中间 → 可切
                     ("p0000:b0002", "3. 丙题"),  # 块首 → 切不出块内第二题
+                    # 同一窗口对同一块再提一次同样的 anchor：提案数 ≠ 提案窗口数
+                    ("p0000:b0001", "2. 乙题"),
                 ],
             ),
             "w0001": _prediction(
@@ -129,7 +131,8 @@ def test_entry_carries_every_provenance_field(tmp_path: pathlib.Path) -> None:
     assert mid["first_proposer_window"] == "w0000"
     assert mid["source_role"] == "PROBLEM_CONTINUATION"
     assert mid["final_role"] == "PROBLEM_CONTINUATION"
-    assert mid["proposer_count"] == 1 and mid["distinct_anchors"] == 1
+    assert mid["proposer_count"] == 2 and mid["distinct_anchors"] == 1
+    assert mid["proposer_window_count"] == 1, "两条提案都来自 w0000"
     assert mid["anchor"] == "2. 乙题"
     assert mid["covering_windows"] == [
         {"window_id": "w0000", "role": "PROBLEM_CONTINUATION"}
@@ -141,6 +144,7 @@ def test_entry_carries_every_provenance_field(tmp_path: pathlib.Path) -> None:
     assert head["outcome"] == "not_applied", "anchor 在块首，切不出块内第二题"
     assert head["placement"] == "statement", "块本身仍进了题面，只是没被切开"
     assert head["proposer_count"] == 2 and head["distinct_anchors"] == 2
+    assert head["proposer_window_count"] == 2, "w0000 与 w0001 各提了一个 anchor"
     assert head["first_proposer_window"] == "w0000", "first-one-wins：归档顺序里的第一个提案"
     assert head["anchor"] == "3. 丙题"
     assert head["source_role"] == "PROBLEM_START"
@@ -172,9 +176,11 @@ def test_summaries_count_from_the_entries(tmp_path: pathlib.Path) -> None:
     assert totals["not_applied_source_problem_final_solution"] == 0
     assert totals["not_applied_source_solution"] == 0
     assert totals["not_applied_source_uncertain"] == 0
-    assert totals["multi_proposer_blocks"] == 1
-    assert totals["multi_proposer_conflicting_anchor"] == 1
-    assert totals["multi_proposer_same_anchor"] == 0
+    assert totals["multi_proposal_blocks"] == 2
+    assert totals["multi_proposal_conflicting_anchor"] == 1
+    assert totals["multi_proposal_same_anchor"] == 1
+    assert totals["multi_window_proposal_blocks"] == 1
+    assert totals["single_window_multi_proposal_blocks"] == 1
     assert totals["role_conflict_splits"] == 1  # 归档 role_conflicts 只记了 b0003
     assert totals["no_role_conflict_but_not_applied"] == 1
     assert totals["anchor_reproduces_archived_range"] == 3
