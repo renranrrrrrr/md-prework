@@ -1,7 +1,7 @@
 # md-prework 交接文档
 
 > 最后更新：2026-09-19 ｜ 交接版本：以 `git log -1` 为准（本文档不再抄自己的 sha，改一行就过期）；
-> 最近一个功能提交 `e6f1214`（silent_loss 修复），milestone tag `prework-semantic-foundation-v1` → `cf13a1c`
+> 最近一个功能提交 `c2e77a7`（语义记账的 token 边界 + split 越界/块首不物化），另有两个只读审计改动 `cae03ae`（replay 默认取归档 reconciled）、`14bf3c3`（split 溯源工具），milestone tag `prework-semantic-foundation-v1` → `cf13a1c`
 > 适用读者：接手本仓库继续开发的工程师（假定熟悉 Python / pytest / 命令行，不假定了解历史决策）
 
 ---
@@ -140,14 +140,15 @@ semantic_baseline.run_document()
 | `tools/weak_question_alignment.py` | 与旧重建结果的弱对齐（block span 分布） |
 | `tools/weak_alignment_anomalies.py` | 弱对齐异常定性（ALIGNMENT_DRIFT / SOLUTION_BLEED / …） |
 | `tools/normalizer_diff_audit.py` | Normalizer 改动分桶（HIGH_RISK / WRAP_MATH_ONLY / …）+ `standalone_numeric_wraps` |
-| `tools/semantic_replay_audit.py` | 离线重放归档的 `semantic-run.json`（用已记录的 predictions 再过一遍 reconcile+assembler），审计覆盖不变量；**不调用任何模型、零成本** |
+| `tools/semantic_replay_audit.py` | 离线重放归档的 `semantic-run.json`（**默认读归档的 `payload["reconciled"]`**，即历史冻结语义，再过一遍 assembler），审计覆盖不变量；**不调用任何模型、零成本**。只有显式加 `--recompute-reconcile` 才用当前 `semantic_reconcile.py` 从归档 predictions 重算；归档缺 `reconciled` 时默认直接报错退出（2），不会静默退回当前代码 |
+| `tools/semantic_split_audit.py` | 离线 split 溯源审计：逐个 resolved split 报告首个提出窗口、提出时该块的 role、所有提出过它的窗口与 anchor、所有覆盖该块的重叠窗口 role、归档 final role、是否 role 冲突/多 anchor、当前 assembler 下 applied/not_applied 与该块最终归属。**只读、不回写、不改生产逻辑**；final role 同样默认取归档 `reconciled` |
 | `tools/block_evidence_benchmark.py` 等 | 全部离线可复跑 |
 
 ### 4.4 测试
 
 | 目录 | 数量 | 命令 |
 | --- | --- | --- |
-| `paddleocr-vl-md/tests/` | **208 项** | `python -m pytest tests -q`（全部离线，不触网/不调模型；其中 `test_wrapper_loss_regression` 需要装了 `paddleocr_mcp` 的环境，缺包会报 ModuleNotFound 而不是逻辑失败） |
+| `paddleocr-vl-md/tests/` | **228 项** | `python -m pytest tests -q`（全部离线，不触网/不调模型；其中 `test_wrapper_loss_regression` 需要装了 `paddleocr_mcp` 的环境，缺包会报 ModuleNotFound 而不是逻辑失败） |
 | `md-math-normalizer/tests/` | **154 项** | `$env:PYTHONPATH="src"; python -m pytest -q -o addopts=""`（该 env 里没装 pytest-timeout） |
 
 ---
@@ -315,10 +316,12 @@ cd D:\Documents\ProblemBank\tmp\mdprework\paddleocr-vl-md
 # 6) 工具
 & $py tools/block_evidence_benchmark.py --evidence-dir <dir> --output <r.json> --markdown <r.md>
 & $py tools/normalizer_diff_audit.py --evidence-dir <dir> --output <r.json> --markdown <r.md>
-& $py tools/semantic_replay_audit.py --run-dir <语义产物目录>   # 重放归档预测审计覆盖不变量（退出码 0 = 无静默丢失）
+& $py tools/semantic_replay_audit.py --run-dir <语义产物目录>   # 重放归档预测审计覆盖不变量（默认用归档 reconciled；退出码 0 = 无静默丢失）
+& $py tools/semantic_replay_audit.py --run-dir <语义产物目录> --recompute-reconcile   # 只在要核对"当前 reconcile 是否偏离历史冻结语义"时加
+& $py tools/semantic_split_audit.py --run-dir <语义产物目录> --output <r.json> --markdown <r.md>   # split 溯源审计（只读）
 
 # 7) 测试
-& $py -m pytest tests -q                       # md-prework：208 项
+& $py -m pytest tests -q                       # md-prework：228 项
 cd ..\md-math-normalizer; $env:PYTHONPATH="src"; & $py -m pytest -q -o addopts=""   # 154 项
 ```
 
@@ -368,6 +371,27 @@ cd ..\md-math-normalizer; $env:PYTHONPATH="src"; & $py -m pytest -q -o addopts="
 | 输出 tokens | 1,250,556 | 3,065 |
 | └ 推理 tokens | **1,109,901（占输出 88.8%）** | **2,720** |
 
+### 9.4 冻结 baseline 重放与 split 溯源（离线，零调用）
+
+`tools/semantic_replay_audit.py`（默认取归档 `reconciled`）与 `tools/semantic_split_audit.py`
+对 18 份 `blocks_20260918\*.semantic-run.json` 的实测：
+
+| 指标 | 值 |
+| --- | --- |
+| runs / blocks / candidates | 18 / **2245** / **312** |
+| silent_loss | **0** |
+| resolved split / applied / not_applied | **133 / 14 / 119** |
+| not_applied 的来源窗口 role（首个提出该 split 的窗口当时给这个块的 role） | SOLUTION_CONTINUATION 62、UNCERTAIN 42、SOLUTION_START 15 |
+| applied 的来源窗口 role | PROBLEM_START 11、PROBLEM_CONTINUATION 3 |
+| not_applied 的归档 final role | UNCERTAIN 60、SOLUTION_CONTINUATION 46、SOLUTION_START 13 |
+| 来源 PROBLEM_* → final UNCERTAIN / final SOLUTION_* | **0 / 0** |
+| 多窗口对同一块提出 split | 82 块（其中 anchor 不同 42、anchor 完全一致 40） |
+| role 冲突的 split / 无 role 冲突但仍 not_applied | 35 / 84 |
+| not_applied 的块最终归属 | `excluded` 60、`solution` 59（applied 的 14 块全部落在 `statement`） |
+| archived vs recomputed reconcile | **一致**（18/18 文档逐字段相同） |
+
+报告落盘：`…\blocks_20260918_benchmark\semantic_split_audit_v1.json` / `.md`。
+
 ---
 
 ## 10. 已知问题与待办（按优先级）
@@ -381,14 +405,17 @@ cd ..\md-math-normalizer; $env:PYTHONPATH="src"; & $py -m pytest -q -o addopts="
    → HEAD 15 / 修复后 0，且 18 份文档的候选引用结构与修复前逐一相同。
    顺带修掉一个同源隐患：split 物化时 `for candidate in candidates` 遍历的正是被追加的那个列表，
    anchor 落在块首（`start = 0`）会让新候选被自己再切一次并无限增长——真实数据没撞上，
-   `tests/test_semantic_no_silent_loss.py` 的全组合扫描能稳定复现。
-2. **成本大头是推理 token（88.8%）**，不是输入或 JSON 结构。见第 11 节的门。
-3. **前 8 份文档没有 usage 记录**（当时还没接 `usage` 字段），所以成本只能按后 10 份外推。
-4. **9/13 扩窗调用尚未执行**：目前只记录触发原因。执行前先看触发率（很高，会让调用量翻 2–3 倍）。
-5. **UNCERTAIN / 冲突率偏高（569 / 576）**：这是 5-block、stride=3 的结构性结果（窗口边缘看不清），不是模型能力问题；扩窗机制就是为了解决它。
-6. **弱对齐仍然不可信**：243/268 题对齐，18 例 `SOLUTION_BLEED`；尝试加"单调搜索 + 答案区截断"后对齐率掉到 125，已降级为实验开关（`--monotonic` / `--zone-cutoff`）。**新的 span 分布要等这套修好才算数**，别用它下窗口参数结论。
-7. **旧布局与新布局并存**：18 份历史数据是旧布局（工具已兼容），新跑的数据走 `<stem>_prework/`。
-8. 题号抽取很朴素：只识别题首 `1.` / `一、`（`semantic_assembler.extract_question_number`），仅用于 provenance 与回归对照。
+   `tests/test_semantic_no_silent_loss.py` 的全组合扫描能稳定复现（`start = 0` 的最终处置见第 3 条）。
+2. **133 个 resolved split 里 14 个物化、119 个未物化**：**119 个 resolved split 在当前 statement-only split contract 下未物化；原因需要结合 split 来源窗口 role、overlap role 与 final reconciled role 审计**（事实见第 9.4 节，逐块溯源见 `tools/semantic_split_audit.py` 的报告）。
+   读这份数字前必须知道的三件事：① `semantic_chain.py` 对 split 是 **first-one-wins**（同一块被多个重叠窗口提出 split 时只留先到的那个，split 不像 role/boundary 那样过 reconcile），所以"最终 anchor"本身就带窗口顺序偏差；② 未物化 ≠ 丢题：这 119 块的最终归属是 `excluded` 60 + `solution` 59，重放 `silent_loss = 0`；③ 来源 role 已经把它们分得很开——119 个里 77 个在提出 split 的那个窗口里就被判成 `SOLUTION_*`、42 个是 `UNCERTAIN`，来源是 `PROBLEM_*` 却被改判的为 **0**。裁决前的下一步不是改 assembler，是先读完溯源报告。
+3. **记账与 split 边界的两处隐患（已修复，`c2e77a7`）**：① `semantic_assembler._mentions_ref()` 过去把"ref 之后的剩余整串"当右边界，导致 `unresolved_split:p0000:b0011:not_found` 这类带后缀的诊断不被算作点名该块——现在只检查紧邻字符（串首/串尾或 `:`）；② `start == 0` 的 resolved split 会物化出 `[0,0)` 零长度题面引用——现在只有 `0 < start < block_len` 才真的切块，否则只记 `split_not_applied:<ref>`，不新建 candidate、不改语义。两处都不改变 18 份真实数据的重放数字（2245 / 312 / 0 / 133 / 119 前后逐项一致），属于关掉潜在洞而非修正结果。
+4. **成本大头是推理 token（88.8%）**，不是输入或 JSON 结构。见第 11 节的门。
+5. **前 8 份文档没有 usage 记录**（当时还没接 `usage` 字段），所以成本只能按后 10 份外推。
+6. **9/13 扩窗调用尚未执行**：目前只记录触发原因。执行前先看触发率（很高，会让调用量翻 2–3 倍）。
+7. **UNCERTAIN / 冲突率偏高（569 / 576）**：这是 5-block、stride=3 的结构性结果（窗口边缘看不清），不是模型能力问题；扩窗机制就是为了解决它。
+8. **弱对齐仍然不可信**：243/268 题对齐，18 例 `SOLUTION_BLEED`；尝试加"单调搜索 + 答案区截断"后对齐率掉到 125，已降级为实验开关（`--monotonic` / `--zone-cutoff`）。**新的 span 分布要等这套修好才算数**，别用它下窗口参数结论。
+9. **旧布局与新布局并存**：18 份历史数据是旧布局（工具已兼容），新跑的数据走 `<stem>_prework/`。
+10. 题号抽取很朴素：只识别题首 `1.` / `一、`（`semantic_assembler.extract_question_number`），仅用于 provenance 与回归对照。
 
 ---
 
@@ -456,7 +483,7 @@ cd ..\md-math-normalizer; $env:PYTHONPATH="src"; & $py -m pytest -q -o addopts="
 ```powershell
 # 1) 两边测试全绿
 cd D:\Documents\ProblemBank\tmp\mdprework\paddleocr-vl-md
-C:\Users\Administrator\.conda\envs\pb\python.exe -m pytest tests -q      # 期望 208 passed
+C:\Users\Administrator\.conda\envs\pb\python.exe -m pytest tests -q      # 期望 228 passed
 cd ..\md-math-normalizer
 $env:PYTHONPATH="src"; C:\Users\Administrator\.conda\envs\pb\python.exe -m pytest -q -o addopts=""   # 期望 154 passed
 
@@ -473,6 +500,18 @@ C:\Users\Administrator\.conda\envs\pb\python.exe semantic_baseline.py `
 #  期望：hard_gates 全 true（覆盖完整 / schema 合法 / 无静默丢失 / reconcile 正常）
 #  注意：默认断点续跑会跳过已有语义产物的文档；对已跑完的目录要加 --force，
 #        否则 documents=0，"全 true" 只是空集上的真值。
+
+# 4) 冻结 baseline 重放 + split 溯源（离线，零 API 调用）
+C:\Users\Administrator\.conda\envs\pb\python.exe tools\semantic_replay_audit.py `
+  --run-dir D:\Documents\ProblemBank\storage\imports\math_olympic_2011_zk1_batch\blocks_20260918 `
+  --output <tmp>\replay.json
+#  期望：runs 18 / blocks 2245 / candidates 312 / silent_loss 0 / resolved_splits 133 / split_not_applied 119
+#        退出码 0（split_not_applied 只是可观测性，不是门）；reconcile 来源 = archived
+#  加 --recompute-reconcile 再跑一次：当前预期两种来源结果一致；一旦不一致说明
+#        semantic_reconcile.py 已偏离这份冻结 baseline，先查清再动数据。
+C:\Users\Administrator\.conda\envs\pb\python.exe tools\semantic_split_audit.py `
+  --run-dir <同上> --output <tmp>\split_audit.json --markdown <tmp>\split_audit.md
+#  期望：resolved 133 / applied 14 / not_applied 119 / anchor_reconstruction_mismatch 0
 ```
 
 ---
