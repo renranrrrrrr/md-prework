@@ -111,6 +111,43 @@ def test_non_idempotent_normalizer_is_reported() -> None:
     )
 
 
+def test_mixed_math_layout_is_preserved_not_fatal() -> None:
+    """块内 display+inline 混排：现有 normalizer 不支持，但块本身可理解 → preserve + warning。"""
+
+    def nested(text: str) -> str:
+        raise ValueError(
+            "ValidationError: ERROR_NESTED_MATH_ENVIRONMENT: nested math in display math at line 3:1"
+        )
+
+    view = nv.build_normalized_view(_evidence(), text_normalizer=nested)
+    text_blocks = [b for b in view["blocks"] if b["profile"] == nv.PROFILE_TEXT]
+    assert all(b["status"] == nv.STATUS_PRESERVED for b in text_blocks)
+    raw_by_ref = {
+        block["block_ref"]: block["content"]
+        for page in _evidence()["pages"]
+        for block in page["blocks"]
+    }
+    assert all(
+        b["normalized_content"] == raw_by_ref[b["block_ref"]] for b in text_blocks
+    ), "preserve 必须原样保留 raw 文本"
+    assert all(
+        diag["code"] == nv.WARN_MIXED_MATH for b in text_blocks for diag in b["diagnostics"]
+    )
+    assert nv.change_impact(text_blocks[0]) == nv.STATUS_PRESERVED
+
+
+def test_unbalanced_math_still_fatal() -> None:
+    """真正不闭合的数学环境仍然是 fatal（不能靠猜测修复）。"""
+
+    def unbalanced(text: str) -> str:
+        raise ValueError("ValidationError: ERROR_UNBALANCED_INLINE_MATH: unclosed inline math")
+
+    view = nv.build_normalized_view(_evidence(), text_normalizer=unbalanced)
+    text_blocks = [b for b in view["blocks"] if b["profile"] == nv.PROFILE_TEXT]
+    assert all(b["status"] == nv.STATUS_FATAL for b in text_blocks)
+    assert all(b["normalized_content"] is None for b in text_blocks)
+
+
 def test_process_file_writes_sidecar_and_keeps_evidence(tmp_path: pathlib.Path) -> None:
     evidence_path = tmp_path / "doc.evidence.json"
     payload = json.dumps(_evidence(), ensure_ascii=False)

@@ -35,6 +35,12 @@ PROFILE_PRESERVE = "preserve"
 STATUS_CHANGED = "changed"
 STATUS_UNCHANGED = "unchanged"
 STATUS_FATAL = "fatal"
+STATUS_PRESERVED = "preserved"
+
+#: 现有 normalizer 不支持"块内 display + inline 数学混排"，但这类块本身可以理解：
+#: 按 GPT 的裁决降级为 preserve + warning，不再算 fatal（fatal 只留给真正不安全的内容）。
+MIXED_MATH_ERROR_MARKER = "NESTED_MATH_ENVIRONMENT"
+WARN_MIXED_MATH = "WARN_UNSUPPORTED_MIXED_MATH_LAYOUT"
 
 FORMULA_LABELS = {"display_formula", "inline_formula"}
 
@@ -123,6 +129,16 @@ def normalize_block(
     try:
         normalized = text_normalizer(content)
     except Exception as exc:  # noqa: BLE001 - fatal 不丢块
+        if MIXED_MATH_ERROR_MARKER in str(exc):
+            entry.update(
+                {
+                    "status": STATUS_PRESERVED,
+                    "normalized_content": content,
+                    "actions": [],
+                    "diagnostics": [{"code": WARN_MIXED_MATH}],
+                }
+            )
+            return entry
         entry.update(
             {
                 "status": STATUS_FATAL,
@@ -160,6 +176,8 @@ def change_impact(block: Mapping[str, Any]) -> str:
 
     if block.get("status") == STATUS_FATAL:
         return STATUS_FATAL
+    if block.get("status") == STATUS_PRESERVED:
+        return STATUS_PRESERVED
     if block.get("status") != STATUS_CHANGED:
         return STATUS_UNCHANGED
     actions = block.get("actions") or []
@@ -192,7 +210,13 @@ def build_normalized_view(
 
 def summarize(view: Mapping[str, Any]) -> dict[str, Any]:
     per_label: dict[str, dict[str, int]] = {}
-    metrics = {"byte_changed": 0, "cosmetic_only": 0, "substantive_changed": 0, STATUS_FATAL: 0}
+    metrics = {
+        "byte_changed": 0,
+        "cosmetic_only": 0,
+        "substantive_changed": 0,
+        STATUS_PRESERVED: 0,
+        STATUS_FATAL: 0,
+    }
     idempotence_failures = 0
     for block in view.get("blocks") or []:
         label = str(block.get("label") or "")
