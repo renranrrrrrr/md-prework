@@ -28,6 +28,7 @@ from typing import Any, Iterable, Mapping, Sequence
 
 PROBE_LENGTHS = (40, 28, 20, 14)
 _WS_RE = re.compile(r"\s+")
+SOLUTION_MARKERS = ("参考答案", "答案与解析", "答案解析", "解答", "解析：")
 
 
 def normalize(text: str) -> str:
@@ -69,23 +70,51 @@ def flatten_blocks(evidence: Mapping[str, Any]) -> list[dict[str, Any]]:
     return blocks
 
 
-def find_start_block(statement: str, blocks: Sequence[Mapping[str, Any]]) -> int | None:
-    """在块序列里定位题干的起始块；找不到返回 None（如实计入失败）。"""
+def find_start_block(
+    statement: str,
+    blocks: Sequence[Mapping[str, Any]],
+    *,
+    search_from: int = 0,
+    search_to: int | None = None,
+) -> tuple[int | None, str]:
+    """在 ``[search_from, search_to)`` 内定位题干起始块，返回 (下标, 置信度)。
+
+    约束是"忠实对齐"而不是"让窗口好看"：
+
+    * 只在**上一题起点之后**搜索（canonical question inventory 的顺序是单调的），
+      这样答案区/解析区里重复出现的题号不会再被当成下一题的起点；
+    * 搜索上界默认停在答案区起点（``solution_zone_start``），避免解析正文污染；
+    * 置信度：命中 40 字符探针 = ``exact``，其余更短探针 = ``approximate``。
+    """
 
     normalized_statement = normalize(statement)
     if not normalized_statement:
-        return None
+        return None, "failed"
+    upper = len(blocks) if search_to is None else max(0, min(search_to, len(blocks)))
     for length in PROBE_LENGTHS:
         probe = normalized_statement[:length]
         if len(probe) < 6:
             continue
-        for index, block in enumerate(blocks):
+        for index in range(max(0, search_from), upper):
+            block = blocks[index]
             content = normalize(str(block.get("content") or ""))
             if not content:
                 continue
             if probe in content:
-                return index
-    return None
+                return index, "exact" if length == PROBE_LENGTHS[0] else "approximate"
+    return None, "failed"
+
+
+def solution_zone_start(blocks: Sequence[Mapping[str, Any]], *, after: int = 0) -> int:
+    """估计答案区起点：首个"像答案区标题"的块；找不到返回块总数。"""
+
+    for index in range(after, len(blocks)):
+        content = normalize(str(blocks[index].get("content") or ""))
+        if not content or len(content) > 30:
+            continue
+        if any(marker in content for marker in SOLUTION_MARKERS):
+            return index
+    return len(blocks)
 
 
 def percentile(values: Sequence[int], ratio: float) -> int:
@@ -96,7 +125,19 @@ def percentile(values: Sequence[int], ratio: float) -> int:
     return int(ordered[position])
 
 
-def align_document(plan_path: pathlib.Path, blocks_evidence_path: pathlib.Path) -> dict[str, Any]:
+def align_document(
+    plan_path: pathlib.Path,
+    blocks_evidence_path: pathlib.Path,
+    *,
+    monotonic: bool = False,
+    zone_cutoff: bool = False,
+) -> dict[str, Any]:
+    """对齐一份文档。
+
+    实测（18 份真实数据）：打开 ``monotonic`` / ``zone_cutoff`` 会把对齐数从 243 降到 125，
+    因为"答案区标题"的文本启发式会把搜索上界截得太早、单调约束又会级联放大一次错配。
+    因此这两个开关默认关闭，等用 plan 自身的 zone 信息重建更可靠的区间边界后再启用。
+    """
     plan = json.loads(plan_path.read_text(encoding="utf-8"))
     old_evidence_path = plan_path.parent / "evidence.json"
     units = load_old_units(old_evidence_path)
@@ -105,14 +146,23 @@ def align_document(plan_path: pathlib.Path, blocks_evidence_path: pathlib.Path) 
 
     questions = list(plan.get("questions") or [])
     starts: list[tuple[str, int]] = []
+    confidences: list[str] = []
     failures: list[str] = []
+    cursor = 0
+    zone_end = solution_zone_start(blocks) if zone_cutoff else len(blocks)
     for question in questions:
         text = statement_text(question, units)
-        index = find_start_block(text, blocks)
+        search_to = zone_end if (zone_cutoff and zone_end > cursor) else None
+        index, confidence = find_start_block(
+            text, blocks, search_from=cursor if monotonic else 0, search_to=search_to
+        )
         if index is None:
             failures.append(str(question.get("source_item_id") or question.get("local_key") or "?"))
             continue
         starts.append((str(question.get("source_item_id") or "?"), index))
+        confidences.append(confidence)
+        if monotonic:
+            cursor = index
 
     spans: list[int] = []
     spans_with_page: list[tuple[int, int]] = []
@@ -133,6 +183,8 @@ def align_document(plan_path: pathlib.Path, blocks_evidence_path: pathlib.Path) 
         "document_id": new_evidence.get("document_id") or blocks_evidence_path.stem,
         "questions": len(questions),
         "aligned": len(starts),
+        "confidence_exact": sum(1 for value in confidences if value == "exact"),
+        "confidence_approximate": sum(1 for value in confidences if value == "approximate"),
         "alignment_failures": failures,
         "block_count": len(blocks),
         "span_p50": percentile(spans, 0.5),
@@ -149,7 +201,13 @@ def align_document(plan_path: pathlib.Path, blocks_evidence_path: pathlib.Path) 
     }
 
 
-def build_report(plan_dir: pathlib.Path, evidence_dir: pathlib.Path) -> dict[str, Any]:
+def build_report(
+    plan_dir: pathlib.Path,
+    evidence_dir: pathlib.Path,
+    *,
+    monotonic: bool = False,
+    zone_cutoff: bool = False,
+) -> dict[str, Any]:
     documents: list[dict[str, Any]] = []
     missing: list[str] = []
     for plan_path in sorted(plan_dir.glob("*/rule_plan.json")):
@@ -158,7 +216,11 @@ def build_report(plan_dir: pathlib.Path, evidence_dir: pathlib.Path) -> dict[str
         if not blocks_path.is_file():
             missing.append(stem)
             continue
-        documents.append(align_document(plan_path, blocks_path))
+        documents.append(
+            align_document(
+                plan_path, blocks_path, monotonic=monotonic, zone_cutoff=zone_cutoff
+            )
+        )
 
     all_spans = [span for doc in documents for span in doc["spans"]]
     questions = sum(doc["questions"] for doc in documents)
@@ -231,6 +293,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--evidence-dir", required=True, help="含 <doc>.evidence.json 的目录")
     parser.add_argument("--output", required=True, help="报告 JSON 输出路径")
     parser.add_argument("--markdown", default="", help="可选 Markdown 摘要")
+    parser.add_argument("--monotonic", action="store_true", help="实验：强制单调搜索（实测会降低对齐率）")
+    parser.add_argument("--zone-cutoff", action="store_true", help="实验：按答案区标题截断搜索")
     return parser.parse_args(argv)
 
 
@@ -241,7 +305,12 @@ def main(argv: list[str] | None = None) -> int:
             stream.reconfigure(encoding="utf-8", errors="replace")
         except (AttributeError, ValueError):
             pass
-    report = build_report(pathlib.Path(args.plan_dir), pathlib.Path(args.evidence_dir))
+    report = build_report(
+        pathlib.Path(args.plan_dir),
+        pathlib.Path(args.evidence_dir),
+        monotonic=args.monotonic,
+        zone_cutoff=args.zone_cutoff,
+    )
     output = pathlib.Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
