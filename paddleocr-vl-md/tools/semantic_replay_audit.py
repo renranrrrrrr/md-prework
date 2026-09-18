@@ -5,6 +5,7 @@
 用它对着冻结的 baseline 重算一遍，就能给出 ``silent_loss`` 前后对比。
 
 只读：不写回任何产物，结果打到 stdout（可选 ``--markdown`` 落一份报告）。
+``split_not_applied`` 只是可观测性计数，不影响退出码——门条件仍是 ``silent_loss == 0``。
 
     python tools/semantic_replay_audit.py --run-dir <blocks_20260918> [--markdown report.md]
 """
@@ -57,6 +58,17 @@ def audit_run(path: pathlib.Path) -> dict[str, Any]:
         for item in assembled.get("excluded") or []
         if item.get("reason") == "unattached_shared_context"
     }
+    not_applied = sorted(
+        str(line).split(":", 1)[1]
+        for line in assembled.get("diagnostics") or []
+        if str(line).startswith("split_not_applied:")
+    )
+    # 角色是"为什么落不了地"的第一手证据：题面块 / 解析块 / 窗口外引用（NO_ROLE）
+    not_applied_roles = {ref: str(roles.get(ref) or "NO_ROLE") for ref in not_applied}
+    resolved = sorted(
+        str(ref) for ref, split in (payload.get("splits") or {}).items()
+        if split.get("status") == "resolved"
+    )
     return {
         "run_file": path.name,
         "document_id": payload.get("document_id"),
@@ -66,7 +78,21 @@ def audit_run(path: pathlib.Path) -> dict[str, Any]:
         "silent_loss_refs": lost,
         "role_of_lost": sorted({str(roles.get(ref)) for ref in lost}),
         "unattached_shared_context": len(unattached),
+        "resolved_splits": len(resolved),
+        "split_not_applied": len(not_applied),
+        "split_not_applied_refs": not_applied,
+        "split_not_applied_roles": not_applied_roles,
     }
+
+
+def _merge_counts(rows: list[dict[str, Any]]) -> dict[str, int]:
+    """把各文档的"未落地 split → 角色"合并成角色分布（按数量降序）。"""
+
+    merged: dict[str, int] = {}
+    for row in rows:
+        for role in (row.get("split_not_applied_roles") or {}).values():
+            merged[role] = merged.get(role, 0) + 1
+    return dict(sorted(merged.items(), key=lambda item: (-item[1], item[0])))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -90,26 +116,38 @@ def main(argv: list[str] | None = None) -> int:
         "candidates": sum(row["candidates"] for row in rows),
         "silent_loss": sum(row["silent_loss"] for row in rows),
         "unattached_shared_context": sum(row["unattached_shared_context"] for row in rows),
+        "resolved_splits": sum(row["resolved_splits"] for row in rows),
+        "split_not_applied": sum(row["split_not_applied"] for row in rows),
+        "split_not_applied_by_role": _merge_counts(rows),
         "documents_with_loss": sum(1 for row in rows if row["silent_loss"]),
     }
     lines = [
-        f"run 文件            块数  候选  silent_loss  尾部共享材料",
-        "-" * 66,
+        "run 文件            块数  候选  silent_loss  尾部共享材料  resolved_split  split_not_applied",
+        "-" * 88,
     ]
     for row in rows:
         lines.append(
             f"{row['run_file'][:20]:<22}{row['blocks']:>6}{row['candidates']:>6}"
             f"{row['silent_loss']:>13}{row['unattached_shared_context']:>16}"
+            f"{row['resolved_splits']:>18}{row['split_not_applied']:>20}"
         )
-    lines.append("-" * 66)
+    lines.append("-" * 88)
     lines.append(
         f"合计                {totals['blocks']:>6}{totals['candidates']:>6}"
         f"{totals['silent_loss']:>13}{totals['unattached_shared_context']:>16}"
+        f"{totals['resolved_splits']:>18}{totals['split_not_applied']:>20}"
     )
+    if totals["split_not_applied"]:
+        lines.append(
+            "未落地 split 的角色分布："
+            + "、".join(f"{role}={n}" for role, n in totals["split_not_applied_by_role"].items())
+        )
     if args.list_refs:
         for row in rows:
             for ref in row["silent_loss_refs"]:
                 lines.append(f"  LOST {row['document_id']} {ref}")
+            for ref, role in sorted((row["split_not_applied_roles"] or {}).items()):
+                lines.append(f"  SPLIT-NOT-APPLIED {row['document_id']} {ref} role={role}")
     report = "\n".join(lines)
     print(report)
 

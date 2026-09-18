@@ -86,3 +86,62 @@ def test_assembly_is_deterministic() -> None:
     reconciled = {"roles": {"b0": "PROBLEM_START", "b1": "PROBLEM_CONTINUATION"}}
     blocks = _blocks()[:2]
     assert sa.assemble(blocks, reconciled) == sa.assemble(blocks, reconciled)
+
+
+# —— resolved 但无处落地的 split 必须可见（可观测性，不改判定）——
+
+
+def test_resolved_split_on_solution_block_is_reported_as_not_applied() -> None:
+    blocks = _blocks()
+    reconciled = {"roles": {"b3": "SOLUTION_START", "b4": "SOLUTION_CONTINUATION"}}
+    split = sa.resolve_split("解析内容 2. 附加题", "2. 附加题")
+    assert split["status"] == "resolved"
+
+    applied_to = sa.assemble(blocks, reconciled, splits={"b4": split})
+    assert "split_not_applied:b4" in applied_to["diagnostics"]
+    baseline = sa.assemble(blocks, reconciled)
+    assert applied_to["candidates"] == baseline["candidates"], "不许改变候选结构"
+    assert applied_to["candidate_count"] == baseline["candidate_count"]
+
+
+def test_resolved_split_on_shared_or_non_problem_block_is_reported() -> None:
+    for role in ("SHARED_CONTEXT", "NON_PROBLEM", "UNCERTAIN"):
+        result = sa.assemble(
+            _blocks(),
+            {"roles": {"b1": role}},
+            splits={"b1": {"status": "resolved", "start": 1, "end": 3}},
+        )
+        assert "split_not_applied:b1" in result["diagnostics"], role
+
+
+def test_applied_split_does_not_emit_not_applied() -> None:
+    result = sa.assemble(
+        [{"block_ref": "b0", "raw_text": "1. 一 2. 二"}],
+        {"roles": {"b0": "PROBLEM_START"}},
+        splits={"b0": sa.resolve_split("1. 一 2. 二", "2. 二")},
+    )
+    assert result["candidate_count"] == 2
+    assert not any(item.startswith("split_not_applied") for item in result["diagnostics"])
+
+
+def test_unresolved_split_keeps_its_own_diagnostic() -> None:
+    """ambiguous / not_found 走 unresolved_split，不与 split_not_applied 混用。"""
+
+    for status, anchor in (("ambiguous", "3. 三"), ("not_found", "9. 九")):
+        result = sa.assemble(
+            _blocks(),
+            {"roles": {"b0": "PROBLEM_START"}},
+            splits={"b0": sa.resolve_split("3. 三 3. 三", anchor)},
+        )
+        expected = f"unresolved_split:b0:{status}"
+        assert expected in result["diagnostics"], status
+        assert not any(item.startswith("split_not_applied") for item in result["diagnostics"]), status
+
+
+def test_split_on_unknown_block_ref_is_reported() -> None:
+    result = sa.assemble(
+        _blocks(), {"roles": {"b0": "PROBLEM_START"}},
+        splits={"b9": {"status": "resolved", "start": 0, "end": 2}},
+    )
+    assert "split_not_applied:b9" in result["diagnostics"]
+    assert sa.unaccounted_blocks(_blocks(), result) == []

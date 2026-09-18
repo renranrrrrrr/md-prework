@@ -190,6 +190,7 @@ def assemble(
             diagnostics.append(f"unresolved_split:{ref}:{split.get('status')}")
             continue
         start, end = int(split["start"]), int(split["end"])
+        applied = False
         # 快照后遍历：下面会往 candidates 里追加，边遍历边追加会让新候选被自己再切一次
         for candidate in list(candidates):
             for index, item in enumerate(candidate.statement_refs):
@@ -206,7 +207,13 @@ def assemble(
                     ]
                     new_candidate.solution_refs = list(candidate.solution_refs)
                     candidates.append(new_candidate)
+                    applied = True
                     break
+        if not applied:
+            # 模型给的 anchor 在原文唯一且解析成功，但该块没有可切的题面区间
+            # （例如被判定为 SOLUTION_*/SHARED_CONTEXT/NON_PROBLEM，或引用了不存在的块）。
+            # 只记可观测性，不改变候选结构，也不回退 split 判定。
+            diagnostics.append(f"split_not_applied:{ref}")
 
     return {
         "schema_version": "md-prework/problem-candidates/v1",
