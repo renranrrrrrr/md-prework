@@ -148,6 +148,22 @@ def test_unbalanced_math_still_fatal() -> None:
     assert all(b["normalized_content"] is None for b in text_blocks)
 
 
+def test_split_left_right_falls_back_to_preserve() -> None:
+    """候选边界把 \\left(\\right) 拆开时，不接受输出，退回原文并记诊断。"""
+
+    def split(text: str) -> str:
+        return text.replace("a+b=10", r"$\Rightarrow\left$($x$)").replace("$", "$")
+
+    view = nv.build_normalized_view(_evidence(), text_normalizer=split)
+    preserved = [b for b in view["blocks"] if b["status"] == nv.STATUS_PRESERVED]
+    assert preserved
+    first = preserved[0]
+    assert first["normalized_content"] == "设 a+b=10 。", "退回原文，不做猜测修复"
+    assert first["diagnostics"] == [{"code": nv.WARN_SPLIT_LEFT_RIGHT}]
+    assert nv.has_unbalanced_left_right(r"$\Rightarrow\left$($x$)") is True
+    assert nv.has_unbalanced_left_right(r"$f: M \rightarrow R$") is False, r"\rightarrow 不是 \right"
+
+
 def test_process_file_writes_sidecar_and_keeps_evidence(tmp_path: pathlib.Path) -> None:
     evidence_path = tmp_path / "doc.evidence.json"
     payload = json.dumps(_evidence(), ensure_ascii=False)

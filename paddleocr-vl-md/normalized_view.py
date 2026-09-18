@@ -22,6 +22,7 @@ import argparse
 import json
 import os
 import pathlib
+import re
 import sys
 from typing import Any, Callable, Mapping, Sequence
 
@@ -41,6 +42,22 @@ STATUS_PRESERVED = "preserved"
 #: 按 GPT 的裁决降级为 preserve + warning，不再算 fatal（fatal 只留给真正不安全的内容）。
 MIXED_MATH_ERROR_MARKER = "NESTED_MATH_ENVIRONMENT"
 WARN_MIXED_MATH = "WARN_UNSUPPORTED_MIXED_MATH_LAYOUT"
+WARN_SPLIT_LEFT_RIGHT = "WARN_SPLIT_LEFT_RIGHT"
+
+#: 数学环境内的 \left / \right 必须成对；候选边界把它们拆开会产生非法 LaTeX。
+_MATH_ENV_RE = re.compile(r"\$[^$\n]*\$")
+_LEFT_RE = re.compile(r"\\left(?![a-z])")
+_RIGHT_RE = re.compile(r"\\right(?![a-z])")
+
+
+def has_unbalanced_left_right(text: str) -> bool:
+    """检测数学环境里被拆散的 ``\\left`` / ``\\right`` 对（``\\rightarrow`` 不算）。"""
+
+    for match in _MATH_ENV_RE.finditer(text):
+        inner = match.group(0)
+        if len(_LEFT_RE.findall(inner)) != len(_RIGHT_RE.findall(inner)):
+            return True
+    return False
 
 FORMULA_LABELS = {"display_formula", "inline_formula"}
 
@@ -152,6 +169,17 @@ def normalize_block(
         return entry
 
     diagnostics: list[dict[str, Any]] = []
+    if has_unbalanced_left_right(normalized):
+        # 候选边界把 \left(...\right) 拆开了：不接受这份输出，退回原文（不猜测修复）。
+        entry.update(
+            {
+                "status": STATUS_PRESERVED,
+                "normalized_content": content,
+                "actions": [],
+                "diagnostics": [{"code": WARN_SPLIT_LEFT_RIGHT}],
+            }
+        )
+        return entry
     try:  # 幂等自检：再跑一遍不应继续变化
         if text_normalizer(normalized) != normalized:
             diagnostics.append({"code": "NOT_IDEMPOTENT"})
