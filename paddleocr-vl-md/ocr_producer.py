@@ -117,26 +117,34 @@ def resolve_token(
 
 @dataclass(frozen=True)
 class BlockEvidence:
-    """一个版面块（字段名与 Paddle 返回一致，另加派生字段）。"""
+    """Stable Core 里的一个版面块。
 
-    block_id: Any
-    block_order: Any
-    reading_order: int
+    命名遵循"事实与解释分离"：
+
+    - ``sequence_index``：块在 ``parsing_res_list`` 数组里的真实位置（事实）；
+    - ``provider_block_order``：Paddle 显式给出的 ``block_order``，**可为 null**（事实）；
+    - ``reading_order``：留给语义层后续派生的解释字段，证据层不写。
+    """
+
+    provider_block_id: Any
+    provider_block_order: Any
+    sequence_index: int
     label: str
     content: str
     bbox: Any = None
-    polygon_points: Any = None
+    polygon: Any = None
     group_id: Any = None
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self, *, page_seq: int) -> dict[str, Any]:
         return {
-            "block_id": self.block_id,
-            "block_order": self.block_order,
-            "reading_order": self.reading_order,
-            "block_label": self.label,
-            "block_content": self.content,
-            "block_bbox": self.bbox,
-            "block_polygon_points": self.polygon_points,
+            "block_ref": f"p{page_seq:04d}:b{self.sequence_index:04d}",
+            "provider_block_id": self.provider_block_id,
+            "provider_block_order": self.provider_block_order,
+            "sequence_index": self.sequence_index,
+            "label": self.label,
+            "content": self.content,
+            "bbox": self.bbox,
+            "polygon": self.polygon,
             "group_id": self.group_id,
             "content_sha256": sha256_text(self.content),
         }
@@ -144,9 +152,9 @@ class BlockEvidence:
 
 @dataclass(frozen=True)
 class PageEvidence:
-    """一页的结构化证据。"""
+    """一页的结构化证据（Stable Core 部分）。"""
 
-    page_index: int
+    page_seq: int
     width: int | None
     height: int | None
     markdown_text: str
@@ -154,37 +162,73 @@ class PageEvidence:
     output_images: Mapping[str, Any] = field(default_factory=dict)
     input_image_url: str = ""
     blocks: tuple[BlockEvidence, ...] = ()
-    layout_boxes_total: int = 0
-    model_settings: Mapping[str, Any] = field(default_factory=dict)
-    raw_pruned_result: Mapping[str, Any] | None = None
+    layout_boxes_count: int = 0
+    preprocessor_applied: bool = False
+    raw_ref: str = ""
 
-    def to_dict(self, *, include_raw: bool) -> dict[str, Any]:
-        payload: dict[str, Any] = {
-            "page_index": self.page_index,
-            "width": self.width,
-            "height": self.height,
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "page_seq": self.page_seq,
+            "page_index_source": "response_sequence",
+            "coordinate_space": {
+                "kind": "preprocessed_page" if self.preprocessor_applied else "provider_page",
+                "width": self.width,
+                "height": self.height,
+            },
+            "layout_detection": {"boxes_count": self.layout_boxes_count},
+            "order_consistency": order_consistency(self.blocks),
             "markdown_text": self.markdown_text,
             "images": {str(key): _redact_remote_value(value) for key, value in self.images.items()},
             "output_images": {
                 str(key): _redact_remote_value(value) for key, value in self.output_images.items()
             },
             "input_image_url": _redact_remote_value(self.input_image_url),
-            "layout_boxes_total": self.layout_boxes_total,
-            "model_settings": dict(self.model_settings),
-            "blocks": [block.to_dict() for block in self.blocks],
+            "raw_ref": self.raw_ref,
+            "blocks": [block.to_dict(page_seq=self.page_seq) for block in self.blocks],
         }
-        if include_raw and self.raw_pruned_result is not None:
-            payload["raw_pruned_result"] = self.raw_pruned_result
-        return payload
+
+
+def order_consistency(blocks: Sequence[BlockEvidence]) -> dict[str, Any]:
+    """块顺序诊断：数组顺序是 canonical，``block_order`` 只作提示与校验。"""
+
+    orders = [block.provider_block_order for block in blocks]
+    present = [value for value in orders if value is not None]
+    conflicts = 0
+    monotonic = True
+    previous: int | None = None
+    for value in present:
+        current = _optional_int(value)
+        if current is None:
+            continue
+        if previous is not None and current < previous:
+            monotonic = False
+            conflicts += 1
+        previous = current
+        position = orders.index(value)
+        if previous is not None and position < 0:
+            conflicts += 1
+    return {
+        "ordered_blocks": len(blocks),
+        "block_order_present": len(present),
+        "block_order_monotonic": bool(monotonic),
+        "block_order_conflicts": int(conflicts),
+    }
 
 
 @dataclass(frozen=True)
 class DocumentResult:
-    """一次文档识别的完整结果（含证据与信封）。"""
+    """一次文档识别的完整结果。
+
+    ``pages`` 是 Stable Core 需要的结构化证据；``raw_pages`` 是逐页 provider
+    原始 ``prunedResult``，只用于写 sidecar 文件，**不会**内嵌进证据主文件。
+    """
 
     markdown: str
     pages: tuple[PageEvidence, ...]
     envelope_keys: tuple[str, ...] = ()
+    model_settings: Mapping[str, Any] = field(default_factory=dict)
+    raw_pages: tuple[Mapping[str, Any] | None, ...] = ()
+    raw_envelope: Any = None
 
     @property
     def page_count(self) -> int:
@@ -577,12 +621,15 @@ def document_result_from_sdk(result: Any, jsonl_data: Any = None) -> DocumentRes
     """把 SDK 的文档解析结果转成 producer 的证据模型。"""
 
     pages: list[PageEvidence] = []
+    raw_pages: list[Mapping[str, Any] | None] = []
     for index, page in enumerate(list(getattr(result, "pages", []) or [])):
         pruned = _as_mapping(getattr(page, "pruned_result", None))
+        raw_pages.append(pruned or None)
         blocks = tuple(_blocks_from_pruned(pruned))
+        settings = _as_mapping(pruned.get("model_settings"))
         pages.append(
             PageEvidence(
-                page_index=index,
+                page_seq=index,
                 width=_optional_int(pruned.get("width")),
                 height=_optional_int(pruned.get("height")),
                 markdown_text=str(getattr(page, "markdown_text", "") or ""),
@@ -590,9 +637,8 @@ def document_result_from_sdk(result: Any, jsonl_data: Any = None) -> DocumentRes
                 output_images=dict(_as_mapping(getattr(page, "output_images", None))),
                 input_image_url=str(getattr(page, "input_image_url", "") or ""),
                 blocks=blocks,
-                layout_boxes_total=_layout_boxes_total(pruned),
-                model_settings=dict(_as_mapping(pruned.get("model_settings"))),
-                raw_pruned_result=pruned or None,
+                layout_boxes_count=_layout_boxes_total(pruned),
+                preprocessor_applied=bool(settings.get("use_doc_preprocessor")),
             )
         )
     markdown = "\n".join(page.markdown_text for page in pages)
@@ -600,6 +646,9 @@ def document_result_from_sdk(result: Any, jsonl_data: Any = None) -> DocumentRes
         markdown=markdown,
         pages=tuple(pages),
         envelope_keys=tuple(_envelope_keys(jsonl_data)),
+        model_settings=_page_model_settings(result),
+        raw_pages=tuple(raw_pages),
+        raw_envelope=jsonl_data,
     )
 
 
@@ -637,20 +686,30 @@ def _blocks_from_pruned(pruned: Mapping[str, Any]) -> list[BlockEvidence]:
         order = raw.get("block_order", raw.get("blockOrder", raw.get("order")))
         blocks.append(
             BlockEvidence(
-                block_id=raw.get("block_id", raw.get("blockId", raw.get("id"))),
-                block_order=order,
-                # 阅读顺序以列表顺序为准：实测 block_order 会为 null（header/doc_title）。
-                reading_order=index,
+                provider_block_id=raw.get("block_id", raw.get("blockId", raw.get("id"))),
+                provider_block_order=order,
+                # 数组位置是事实；阅读顺序（reading_order）留给语义层派生。
+                sequence_index=index,
                 label=str(raw.get("block_label") or raw.get("blockLabel") or raw.get("label") or ""),
                 content=str(
                     raw.get("block_content") or raw.get("blockContent") or raw.get("content") or ""
                 ),
                 bbox=raw.get("block_bbox", raw.get("blockBbox", raw.get("bbox"))),
-                polygon_points=raw.get("block_polygon_points", raw.get("polygon_points")),
+                polygon=raw.get("block_polygon_points", raw.get("polygon_points")),
                 group_id=raw.get("group_id", raw.get("groupId")),
             )
         )
     return blocks
+
+
+def _page_model_settings(result: Any) -> dict[str, Any]:
+    """取第一页的 model_settings 作为 producer 配置（逐页副本仍在 raw 里）。"""
+
+    for page in list(getattr(result, "pages", []) or []):
+        settings = _as_mapping(_as_mapping(getattr(page, "pruned_result", None)).get("model_settings"))
+        if settings:
+            return settings
+    return {}
 
 
 def _layout_boxes_total(pruned: Mapping[str, Any]) -> int:
@@ -683,28 +742,52 @@ def build_evidence(
     model: str,
     provider: str,
     token_source: str,
+    page_ranges: str = "",
     producer_version: str = PRODUCER_VERSION,
     created_at: str = "",
     asset_records: Sequence[Mapping[str, Any]] = (),
-    include_raw: bool = False,
+    raw_mode: str = "page",
+    mcp_version: str = "",
 ) -> dict[str, Any]:
-    """构造不可变证据包（``md-prework/ocr-evidence/v1``）。"""
+    """构造不可变证据包（``md-prework/ocr-evidence/v1`` 的 Stable Core）。"""
 
-    page_payloads = [page.to_dict(include_raw=include_raw) for page in document.pages]
+    source_sha256 = sha256_file(source_path)
+    document_id = f"{source_path.stem}-{source_sha256[:8]}"
+    config_hash = producer_config_hash(
+        model=model,
+        provider=provider,
+        page_ranges=page_ranges,
+        mcp_version=mcp_version,
+        raw_mode=raw_mode,
+    )
+    page_payloads: list[dict[str, Any]] = []
+    for page in document.pages:
+        payload = page.to_dict()
+        payload["raw_ref"] = (
+            f"{source_path.stem}_raw/page-{page.page_seq + 1:04d}.json" if raw_mode != "none" else ""
+        )
+        page_payloads.append(payload)
     return {
         "schema_version": EVIDENCE_SCHEMA_VERSION,
-        "document_id": source_path.stem,
+        "document_id": document_id,
         "created_at": created_at or datetime.now(timezone.utc).isoformat(),
+        "identity": {
+            "document_id": document_id,
+            "source_sha256": source_sha256,
+            "producer_config_hash": config_hash,
+        },
         "producer": {
             "name": PRODUCER_NAME,
             "version": producer_version,
             "model": model,
             "provider": provider,
+            "paddleocr_mcp_version": mcp_version,
+            "settings": dict(document.model_settings),
             "token_source": token_source,
         },
         "source": {
-            "name": source_path.name,
-            "sha256": sha256_file(source_path),
+            "filename": source_path.name,
+            "sha256": source_sha256,
             "size_bytes": source_path.stat().st_size,
         },
         "envelope_keys": list(document.envelope_keys),
@@ -716,19 +799,54 @@ def build_evidence(
     }
 
 
+def producer_config_hash(
+    *,
+    model: str,
+    provider: str,
+    page_ranges: str,
+    mcp_version: str,
+    raw_mode: str,
+    producer_version: str = PRODUCER_VERSION,
+) -> str:
+    """producer 配置指纹：配置相同 = 同一份证据可以复用。"""
+
+    payload = {
+        "producer_version": producer_version,
+        "model": model,
+        "provider": provider,
+        "page_ranges": page_ranges,
+        "paddleocr_mcp_version": mcp_version,
+        "raw_mode": raw_mode,
+    }
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")
+    ).hexdigest()
+
+
+def paddleocr_mcp_version() -> str:
+    try:
+        from importlib.metadata import version
+
+        return version("paddleocr-mcp")
+    except Exception:  # noqa: BLE001 - 只是记录用，拿不到就留空
+        return ""
+
+
 def evidence_content_hash(page_payloads: Sequence[Mapping[str, Any]]) -> str:
     """内容哈希：绑定页序、块序、块标签与块内容（不含派生视图）。"""
 
     digest = hashlib.sha256()
     for page in page_payloads:
         digest.update(
-            f"P{page.get('page_index')}|{page.get('width')}x{page.get('height')}\n".encode()
+            f"P{page.get('page_seq')}|"
+            f"{(page.get('coordinate_space') or {}).get('width')}x"
+            f"{(page.get('coordinate_space') or {}).get('height')}\n".encode()
         )
         for block in page.get("blocks") or []:
             digest.update(
                 (
-                    f"B{block.get('reading_order')}|{block.get('block_id')}|"
-                    f"{block.get('block_label')}|{block.get('content_sha256')}\n"
+                    f"B{block.get('sequence_index')}|{block.get('provider_block_id')}|"
+                    f"{block.get('label')}|{block.get('content_sha256')}\n"
                 ).encode("utf-8", "replace")
             )
         digest.update(str(page.get("markdown_text") or "").encode("utf-8", "replace"))
@@ -762,27 +880,67 @@ def write_raw_pages(
     *,
     mode: str = "page",
 ) -> list[pathlib.Path]:
-    """把每页的原始 ``prunedResult`` 原样落盘（原子写，不改内容）。"""
+    """落盘 provider 原始页结果（第二级：Provider Raw Page Artifact）。
+
+    ``none`` 不写（测试/轻量）；``page`` 写每页完整 ``prunedResult``（生产默认）；
+    ``full`` 额外写作业信封（调试用，写盘前剔除 token / 凭证 / 请求头类字段）。
+    """
 
     if mode == "none":
         return []
     written: list[pathlib.Path] = []
     raw_dir.mkdir(parents=True, exist_ok=True)
-    for page in document.pages:
-        payload: Any
-        if mode == "page":
-            payload = page.raw_pruned_result
-        else:
+    for page, raw in zip(document.pages, document.raw_pages):
+        payload: Any = raw
+        if mode == "full":
             payload = {
-                "pruned_result": page.raw_pruned_result,
+                "page_seq": page.page_seq,
+                "pruned_result": raw,
                 "markdown": page.markdown_text,
                 "output_images": dict(page.output_images),
                 "input_image_url": page.input_image_url,
             }
         if not payload:
             continue
-        written.append(write_json_atomic(raw_dir / f"page-{page.page_index + 1:04d}.json", payload))
+        written.append(write_json_atomic(raw_dir / f"page-{page.page_seq:04d}.json", payload))
+    if mode == "full" and document.raw_envelope is not None:
+        written.append(
+            write_json_atomic(raw_dir / "envelope.json", scrub_secrets(document.raw_envelope))
+        )
     return written
+
+
+_SENSITIVE_KEY_RE = re.compile(
+    r"(token|secret|password|passwd|api[_-]?key|authorization|cookie|credential|signature)",
+    re.IGNORECASE,
+)
+_LONG_OPAQUE_RE = re.compile(r"(?<![A-Za-z0-9_\-/])[A-Za-z0-9_\-]{32,}(?![A-Za-z0-9_\-/])")
+
+
+def scrub_secrets(value: Any, *, depth: int = 0) -> Any:
+    """递归剔除敏感字段：token / 凭证 / 请求头 / 长随机串一律不落盘。"""
+
+    if depth > 12:
+        return "<<depth-limit>>"
+    if isinstance(value, Mapping):
+        result: dict[str, Any] = {}
+        for key, item in value.items():
+            key_text = str(key)
+            if _SENSITIVE_KEY_RE.search(key_text):
+                result[key_text] = "<<redacted>>"
+                continue
+            result[key_text] = scrub_secrets(item, depth=depth + 1)
+        return result
+    if isinstance(value, (list, tuple)):
+        return [scrub_secrets(item, depth=depth + 1) for item in value]
+    if isinstance(value, str):
+        has_upper = any(char.isupper() for char in value)
+        has_lower = any(char.islower() for char in value)
+        has_digit = any(char.isdigit() for char in value)
+        if _LONG_OPAQUE_RE.search(value) and has_upper and has_lower and has_digit:
+            return "<<redacted:opaque>>"
+        return value
+    return value
 
 
 def write_status_log(output_dir: pathlib.Path, rows: Sequence[ConvertOutcome]) -> pathlib.Path:
@@ -925,14 +1083,17 @@ async def convert_pdf(
     outcome.image_failures = failures
 
     if write_evidence_file:
+        mcp_version = paddleocr_mcp_version()
         evidence = build_evidence(
             document,
             source_path=pdf,
             model=model,
             provider=provider,
             token_source=token_source,
+            page_ranges=page_ranges,
             asset_records=records,
-            include_raw=raw_mode == "full",
+            raw_mode=raw_mode,
+            mcp_version=mcp_version,
         )
         write_evidence(evidence_path, evidence, overwrite=overwrite)
         write_raw_pages(document, target_dir / f"{pdf.stem}_raw", mode=raw_mode)

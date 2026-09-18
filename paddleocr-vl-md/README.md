@@ -52,10 +52,19 @@
   ocr_summary.json        # 每次运行：汇总（含每份 pages/blocks/images/失败原因）
 ```
 
-证据里保存的是 Paddle 真正给出的块级结构（见 `capability/README.md` 的实跑证据）：
-`block_id` / `block_order` / `block_label` / `block_content` / `block_bbox` /
-`block_polygon_points` / `group_id`，另加 producer 派生的 `reading_order`
-（以块列表顺序为准，因为实测 `block_order` 有约 15%–19% 为 null）。
+证据分三级（见 `capability/README.md` 的实跑证据）：
+
+1. **Stable Core**（`<stem>.evidence.json`）：`block_ref` / `provider_block_id` /
+   `provider_block_order`（Paddle 字段，可为 null）/ `sequence_index`（数组位置，事实）/
+   `label` / `content` / `bbox` / `polygon` / `group_id`，以及每页的 `page_seq`、
+   `page_index_source`、`coordinate_space`、`layout_detection.boxes_count`、`order_consistency`；
+   **不写**解释性的 `reading_order`（留给语义层派生），也**不内嵌** provider raw；
+2. **Provider Raw Page**（`<stem>_raw/page-NNNN.json`，默认开启）：每页完整 `prunedResult`；
+3. **Heavy Binary**（`preprocessedImages` 之类）：只以引用 + sha256 形式出现，绝不内嵌 base64。
+
+`--evidence-raw` 取值：`none`（测试/轻量）、`page`（生产默认）、`full`（调试，额外落作业信封，
+写盘前剔除 token / 凭证 / 请求头）。证据身份用 `document_id = <stem>-<source sha256 前 8 位>`
+与 `producer_config_hash` 记录，不把文件名当身份。
 
 三条不变量：
 

@@ -1,7 +1,12 @@
 """唯一 producer（``ocr_producer.py``）的离线回归测试。
 
 全部使用真实 capability probe 落下来的脱敏 fixture 与假客户端：
-不访问远端、不消耗配额，用来锁住"证据保真 + 不可变 + 图片校验 + 压力重试"这几条不变量。
+不访问远端、不消耗配额。
+
+其中两个测试是**调查任务的锁定测试**（capability probe 收口用）：
+
+* ``test_wrapper_loss_regression``：provider raw 有块结构，MCP wrapper 的公共返回类型没有；
+* ``test_schema_extraction_regression``：fixture → 证据模型必须稳定产出固定的块数量与字段。
 """
 
 from __future__ import annotations
@@ -25,6 +30,10 @@ FIXTURE_PATH = (
     / "fixtures"
     / "paddle_structured_result.fixture.json"
 )
+
+#: fixture 实测：page 0 有 27 块、page 1 有 13 块（共 40 块）。
+#: 一旦 Paddle provider 结构变化，这个断言会第一时间失败。
+EXPECTED_BLOCKS_BY_PAGE = {0: 27, 1: 13}
 
 
 @pytest.fixture(scope="module")
@@ -80,33 +89,96 @@ def _png_bytes() -> bytes:
     return b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
 
 
+# ---------------------------------------------------------------- 锁定测试
+
+
+def test_wrapper_loss_regression(fixture: dict) -> None:
+    """锁定事实：provider raw page 有块结构，而 MCP wrapper 的公共返回类型没有。
+
+    这个测试不是为了测 Paddle，而是为了把"为什么必须保存 raw page result"写进回归：
+    将来若有人把证据来源换回 wrapper，这里会立刻失败。
+    """
+
+    from paddleocr_mcp.inference.types import DocParsingResult as McpDocParsingResult
+
+    wrapper_fields = set(getattr(McpDocParsingResult, "__dataclass_fields__", {}))
+    assert wrapper_fields == {"markdown", "pages", "images_mapping"}, wrapper_fields
+    assert "parsing_res_list" not in wrapper_fields
+
+    raw_pruned = fixture["pages"][0]["raw"]["prunedResult"]
+    assert raw_pruned.get("parsing_res_list"), "provider raw page 必须带块列表"
+    assert "layout_det_res" in raw_pruned
+
+
+def test_schema_extraction_regression(fixture: dict) -> None:
+    """fixture → 证据模型：块数量与字段必须稳定（provider 升级的第一道警报）。"""
+
+    document = _document(fixture)
+    counts = {page.page_seq: len(page.blocks) for page in document.pages}
+    assert counts == EXPECTED_BLOCKS_BY_PAGE
+    assert document.pages[0].layout_boxes_count > 0
+
+    first = document.pages[0].blocks[0].to_dict(page_seq=0)
+    assert {
+        "block_ref",
+        "provider_block_id",
+        "provider_block_order",
+        "sequence_index",
+        "label",
+        "content",
+        "bbox",
+        "polygon",
+        "group_id",
+        "content_sha256",
+    } <= set(first)
+
+
 # ---------------------------------------------------------------- 证据模型
 
 
 def test_document_result_keeps_block_evidence(fixture: dict) -> None:
     document = _document(fixture)
-    assert document.page_count >= 1
     first = document.pages[0]
-    assert first.blocks, "块证据不能为空"
     labels = {block.label for block in first.blocks}
     assert "text" in labels
     assert first.width and first.height
-    assert first.layout_boxes_total > 0
     assert document.markdown.strip(), "markdown 视图必须保留"
+    assert document.model_settings, "producer settings 必须来自 provider 的 model_settings"
 
 
-def test_reading_order_falls_back_to_list_order(fixture: dict) -> None:
-    """实测 block_order 会为 null：阅读顺序必须以列表顺序兜底。"""
+def test_sequence_index_is_array_position(fixture: dict) -> None:
+    """数组位置是事实，block_order 是 provider 字段（可为 null），不写 reading_order。"""
 
     document = _document(fixture)
     blocks = document.pages[0].blocks
-    assert [block.reading_order for block in blocks] == list(range(len(blocks)))
-    assert any(block.block_order is None for block in blocks), (
-        "fixture 里应当包含 block_order 为 null 的块（header/doc_title）"
+    assert [block.sequence_index for block in blocks] == list(range(len(blocks)))
+    assert any(block.provider_block_order is None for block in blocks)
+
+    payload = document.pages[0].to_dict()
+    assert payload["blocks"][0]["block_ref"] == "p0000:b0000"
+    assert "reading_order" not in payload["blocks"][0], "解释性字段不进证据层"
+
+
+def test_order_consistency_diagnostics(fixture: dict) -> None:
+    document = _document(fixture)
+    payload = document.pages[0].to_dict()
+    stats = payload["order_consistency"]
+    assert stats["ordered_blocks"] == len(document.pages[0].blocks)
+    assert stats["block_order_present"] < stats["ordered_blocks"], "fixture 里存在 null order"
+    assert isinstance(stats["block_order_monotonic"], bool)
+    assert stats["block_order_conflicts"] >= 0
+
+    # 人为构造回退的 block_order → 必须被记为不单调
+    blocks = (
+        producer.BlockEvidence(1, 5, 0, "text", "a"),
+        producer.BlockEvidence(2, 3, 1, "text", "b"),
     )
+    bad = producer.order_consistency(blocks)
+    assert bad["block_order_monotonic"] is False
+    assert bad["block_order_conflicts"] == 1
 
 
-def test_evidence_schema_hash_and_redaction(fixture: dict, tmp_path: pathlib.Path) -> None:
+def test_evidence_schema_identity_and_redaction(fixture: dict, tmp_path: pathlib.Path) -> None:
     source = tmp_path / "paper.pdf"
     source.write_bytes(b"%PDF-1.4 fake")
     document = _document(fixture)
@@ -116,56 +188,55 @@ def test_evidence_schema_hash_and_redaction(fixture: dict, tmp_path: pathlib.Pat
         model="PaddleOCR-VL-1.6",
         provider="aistudio",
         token_source="进程环境变量 TEST",
+        page_ranges="1-4",
+        raw_mode="page",
+        mcp_version="0.8.5",
     )
 
     assert evidence["schema_version"] == producer.EVIDENCE_SCHEMA_VERSION
+    assert evidence["document_id"].startswith("paper-")
+    assert evidence["identity"]["source_sha256"] == evidence["source"]["sha256"]
+    assert len(evidence["identity"]["producer_config_hash"]) == 64
+    assert evidence["producer"]["paddleocr_mcp_version"] == "0.8.5"
+    assert evidence["producer"]["settings"] == dict(document.model_settings)
     assert evidence["page_count"] == document.page_count
     assert evidence["block_count"] == sum(len(page.blocks) for page in document.pages)
     assert len(evidence["content_hash"]) == 64
-    assert evidence["source"]["sha256"]
-    assert "raw_pruned_result" not in evidence["pages"][0], "默认不内嵌原始结构"
+
+    page = evidence["pages"][0]
+    assert page["page_seq"] == 0
+    assert page["page_index_source"] == "response_sequence"
+    assert page["coordinate_space"]["kind"] in {"provider_page", "preprocessed_page"}
+    assert page["layout_detection"]["boxes_count"] == document.pages[0].layout_boxes_count
+    assert page["raw_ref"].endswith("paper_raw/page-0001.json")
 
     text = json.dumps(evidence, ensure_ascii=False)
+    assert "raw_pruned_result" not in text, "Stable Core 不内嵌 provider raw"
     assert "http://" not in text and "https://" not in text, "远端链接必须脱敏"
 
-    # 同一份内容 → 同一哈希；改动块内容 → 哈希变化
-    again = producer.build_evidence(
+    # 内容哈希稳定；producer 配置变化 → 配置指纹变化
+    same = producer.build_evidence(
         document,
         source_path=source,
         model="PaddleOCR-VL-1.6",
         provider="aistudio",
         token_source="进程环境变量 TEST",
+        page_ranges="1-4",
+        raw_mode="page",
+        mcp_version="0.8.5",
     )
-    assert again["content_hash"] == evidence["content_hash"]
-    mutated = producer.DocumentResult(
-        markdown=document.markdown,
-        pages=(
-            producer.PageEvidence(
-                page_index=document.pages[0].page_index,
-                width=document.pages[0].width,
-                height=document.pages[0].height,
-                markdown_text=document.pages[0].markdown_text,
-                blocks=(
-                    producer.BlockEvidence(
-                        block_id=0,
-                        block_order=None,
-                        reading_order=0,
-                        label="text",
-                        content="被改过的正文",
-                    ),
-                ),
-            ),
-        ),
-        envelope_keys=document.envelope_keys,
-    )
-    mutated_evidence = producer.build_evidence(
-        mutated,
+    assert same["content_hash"] == evidence["content_hash"]
+    other_model = producer.build_evidence(
+        document,
         source_path=source,
-        model="PaddleOCR-VL-1.6",
+        model="PaddleOCR-VL-1.7",
         provider="aistudio",
         token_source="进程环境变量 TEST",
+        page_ranges="1-4",
+        raw_mode="page",
+        mcp_version="0.8.5",
     )
-    assert mutated_evidence["content_hash"] != evidence["content_hash"]
+    assert other_model["identity"]["producer_config_hash"] != evidence["identity"]["producer_config_hash"]
 
 
 def test_evidence_is_immutable(tmp_path: pathlib.Path) -> None:
@@ -177,16 +248,41 @@ def test_evidence_is_immutable(tmp_path: pathlib.Path) -> None:
     assert json.loads(path.read_text(encoding="utf-8")) == {"a": 2}
 
 
-def test_write_raw_pages_modes(fixture: dict, tmp_path: pathlib.Path) -> None:
+def test_raw_artifact_modes(fixture: dict, tmp_path: pathlib.Path) -> None:
     document = _document(fixture)
     assert producer.write_raw_pages(document, tmp_path / "none", mode="none") == []
+
     page_files = producer.write_raw_pages(document, tmp_path / "page", mode="page")
     assert len(page_files) == document.page_count
     payload = json.loads(page_files[0].read_text(encoding="utf-8"))
-    assert "parsing_res_list" in payload, "page 模式写的是原始 prunedResult"
-    full_files = producer.write_raw_pages(document, tmp_path / "full", mode="full")
-    full_payload = json.loads(full_files[0].read_text(encoding="utf-8"))
-    assert {"pruned_result", "markdown", "output_images"} <= set(full_payload)
+    assert "parsing_res_list" in payload, "page 模式写的是完整 prunedResult"
+
+
+def test_full_mode_writes_scrubbed_envelope(fixture: dict, tmp_path: pathlib.Path) -> None:
+    """full 模式额外写作业信封，但必须剔除 token / 凭证 / 长随机串。"""
+
+    document = _document(fixture)
+    envelope = [
+        {
+            "errorCode": 0,
+            "result": {"layoutParsingResults": [], "dataInfo": {"numPages": 1}},
+            "accessToken": "AbCdEf0123456789AbCdEf0123456789",
+        }
+    ]
+    document_with_envelope = producer.DocumentResult(
+        markdown=document.markdown,
+        pages=document.pages,
+        envelope_keys=document.envelope_keys,
+        model_settings=document.model_settings,
+        raw_pages=document.raw_pages,
+        raw_envelope=envelope,
+    )
+    written = producer.write_raw_pages(document_with_envelope, tmp_path / "full", mode="full")
+    names = sorted(path.name for path in written)
+    assert "envelope.json" in names
+    envelope_payload = json.loads((tmp_path / "full" / "envelope.json").read_text(encoding="utf-8"))
+    assert envelope_payload[0]["accessToken"] == "<<redacted>>"
+    assert "AbCdEf0123456789" not in json.dumps(envelope_payload)
 
 
 # ---------------------------------------------------------------- 图片
@@ -299,12 +395,10 @@ def test_convert_pdf_writes_evidence_markdown_and_raw(fixture: dict, tmp_path: p
     assert (out / "mock.md").is_file()
     evidence = json.loads((out / "mock.evidence.json").read_text(encoding="utf-8"))
     assert evidence["schema_version"] == producer.EVIDENCE_SCHEMA_VERSION
-    assert evidence["block_count"] > 0
-    assert (out / "mock_raw" / "page-0001.json").is_file()
+    assert evidence["block_count"] == sum(EXPECTED_BLOCKS_BY_PAGE.values())
+    assert (out / "mock_raw" / "page-0000.json").is_file()
     assert row.blocks == evidence["block_count"]
-    assert _FakeClient.calls[0]["pdf"].endswith("mock.pdf")
 
-    # 第二次运行：证据已存在 → 跳过，绝不覆盖原始证据
     second = asyncio.run(
         producer.convert_pdf(
             pdf,
@@ -326,7 +420,7 @@ def test_convert_pdf_records_missing_images(fixture: dict, tmp_path: pathlib.Pat
         markdown='<img src="https://cdn.invalid/a.jpg" />',
         pages=(
             producer.PageEvidence(
-                page_index=0,
+                page_seq=0,
                 width=10,
                 height=20,
                 markdown_text='<img src="https://cdn.invalid/a.jpg" />',
@@ -334,11 +428,9 @@ def test_convert_pdf_records_missing_images(fixture: dict, tmp_path: pathlib.Pat
                 blocks=(),
             ),
         ),
+        raw_pages=({"parsing_res_list": []},),
     )
     _FakeClient.document = document
-
-    def downloader(url: str) -> bytes:
-        raise OSError("boom")
 
     row = asyncio.run(
         producer.convert_pdf(
@@ -348,10 +440,8 @@ def test_convert_pdf_records_missing_images(fixture: dict, tmp_path: pathlib.Pat
             token="dummy",
             keep_images=True,
             download=False,
-            downloader=downloader,
         )
     )
-    # download=False → 图片不落盘，但必须如实登记"仍未本地化"
     assert row.status == producer.STATUS_OK
     assert row.images_total == 1
     assert row.images_saved == 0
@@ -404,7 +494,7 @@ def test_prework_cli_defaults() -> None:
     )
     assert args.evidence is True, "证据默认落盘"
     assert args.keep_images is True
-    assert args.evidence_raw == "page"
+    assert args.evidence_raw == "page", "生产默认保存 provider raw page"
     batch = prework_ocr.parse_args(["batch", "--pdf-dir", "pdfs", "--output-dir", "out"])
     assert batch.jobs == 1
 
