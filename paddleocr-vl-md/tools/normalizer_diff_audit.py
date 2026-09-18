@@ -74,6 +74,7 @@ def collect(evidence_dir: pathlib.Path) -> tuple[dict[str, list[dict[str, Any]]]
         "OTHER": [],
     }
     fatals: list[dict[str, Any]] = []
+    numeric_wraps = 0
     for evidence_path in sorted(evidence_dir.glob("*.evidence.json")):
         view_path = evidence_path.with_name(
             evidence_path.name.replace(".evidence.json", ".normalized.json")
@@ -104,6 +105,7 @@ def collect(evidence_dir: pathlib.Path) -> tuple[dict[str, list[dict[str, Any]]]
                 continue
             normalized = str(block.get("normalized_content") or "")
             original = raw.get(ref, "")
+            numeric_wraps += count_standalone_numeric_wraps(original, normalized)
             buckets[classify_diff(original, normalized)].append(
                 {
                     "document_id": document_id,
@@ -113,7 +115,7 @@ def collect(evidence_dir: pathlib.Path) -> tuple[dict[str, list[dict[str, Any]]]
                     "distance": _distance(original, normalized),
                 }
             )
-    return buckets, fatals
+    return buckets, fatals, numeric_wraps
 
 
 def _distance(a: str, b: str) -> int:
@@ -125,6 +127,28 @@ def _distance(a: str, b: str) -> int:
             break
         common += 1
     return (len(a) - common) + (len(b) - common)
+
+
+def count_standalone_numeric_wraps(raw: str, normalized: str) -> int:
+    """统计"孤立数字被新包进数学环境"的次数（GPT 冻结门的核心指标）。
+
+    只数数学环境里**只有数字**（可带千分位/小数点/百分号）的情形，且是相对原文的增量，
+    不会把原文已有的 ``$10$`` 算进去。
+    """
+
+    def spans(text: str) -> list[str]:
+        found: list[str] = []
+        for match in re.finditer(r"\$[^$\n]*\$", text):
+            inner = match.group(0).strip("$").strip()
+            if inner and re.fullmatch(r"[\d,]+(?:\.\d+)?%?", inner):
+                found.append(inner)
+        return found
+
+    extra = spans(normalized)
+    for item in spans(raw):
+        if item in extra:
+            extra.remove(item)
+    return len(extra)
 
 
 QUOTA = {
@@ -164,7 +188,7 @@ def main(argv: list[str] | None = None) -> int:
         except (AttributeError, ValueError):
             pass
 
-    buckets, fatals = collect(pathlib.Path(args.evidence_dir))
+    buckets, fatals, numeric_wraps = collect(pathlib.Path(args.evidence_dir))
     chosen = sample(buckets)
     report = {
         "schema_version": "md-prework/normalizer-diff-audit/v1",
@@ -173,6 +197,7 @@ def main(argv: list[str] | None = None) -> int:
         "high_risk_ratio": round(len(buckets["HIGH_RISK"]) / max(1, sum(len(v) for v in buckets.values())), 4),
         "sample": chosen,
         "fatal": fatals,
+        "standalone_numeric_wraps": numeric_wraps,
     }
     output = pathlib.Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -192,7 +217,7 @@ def main(argv: list[str] | None = None) -> int:
         markdown_path.parent.mkdir(parents=True, exist_ok=True)
         markdown_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-    print(json.dumps({"buckets": report["buckets"], "changed_text_total": report["changed_text_total"], "high_risk_ratio": report["high_risk_ratio"], "fatal": len(fatals)}, ensure_ascii=False, indent=2))
+    print(json.dumps({"buckets": report["buckets"], "changed_text_total": report["changed_text_total"], "high_risk_ratio": report["high_risk_ratio"], "fatal": len(fatals), "standalone_numeric_wraps": numeric_wraps}, ensure_ascii=False, indent=2))
     return 0
 
 
