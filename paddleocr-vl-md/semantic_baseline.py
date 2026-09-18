@@ -89,6 +89,7 @@ def run_document(
     *,
     window_size: int = windowing.DEFAULT_WINDOW_SIZE,
     stride: int = windowing.DEFAULT_STRIDE,
+    dump_dir: pathlib.Path | None = None,
 ) -> dict[str, Any]:
     document = windowing.load_document(evidence_path, view_path)
     provider = provider_factory()
@@ -136,6 +137,25 @@ def run_document(
         "assembler_no_silent_loss": not silent_loss,
         "overlap_reconcile_ok": isinstance(result["reconciled"].get("has_conflict"), bool),
     }
+    if dump_dir is not None:
+        dump_dir.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "schema_version": "md-prework/semantic-run/v1",
+            "document_id": document.get("document_id"),
+            "evidence_hash": document.get("evidence_hash"),
+            "window_size": window_size,
+            "stride": stride,
+            "windows": result["windows"],
+            "predictions": result["predictions"],
+            "reconciled": result["reconciled"],
+            "expansion": result["expansion"],
+            "splits": result["splits"],
+            "candidates": result["candidates"],
+            "prompt_version": prompt_mod.SYSTEM_PROMPT[:60],
+        }
+        (dump_dir / f"{evidence_path.name.replace('.evidence.json', '')}.semantic.json").write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
     return {
         "document_id": document.get("document_id"),
         "blocks": len(document.get("blocks") or []),
@@ -183,6 +203,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--model", default="deepseek-v4-flash")
     parser.add_argument("--token", default="")
     parser.add_argument("--output", required=True)
+    parser.add_argument("--dump-dir", default="", help="把每份的窗口/预测/候选落盘（困难样本留档）")
     parser.add_argument("--window-size", type=int, default=windowing.DEFAULT_WINDOW_SIZE)
     parser.add_argument("--stride", type=int, default=windowing.DEFAULT_STRIDE)
     args = parser.parse_args(argv)
@@ -217,6 +238,7 @@ def main(argv: list[str] | None = None) -> int:
                 factory,
                 window_size=args.window_size,
                 stride=args.stride,
+                dump_dir=pathlib.Path(args.dump_dir) if args.dump_dir else None,
             )
         )
 
