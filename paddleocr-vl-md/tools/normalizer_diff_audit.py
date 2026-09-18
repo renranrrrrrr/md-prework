@@ -23,7 +23,8 @@ from typing import Any, Mapping, Sequence
 
 #: 高风险只看 GPT 列出的具体模式，不做"没有数学符号就算高风险"这类粗判：
 #: 连续英文词被包成数学、年份被数学化、纯数字被数学化。
-ASCII_WORD_IN_MATH_RE = re.compile(r"\$[^$]*\b[A-Za-z]{3,}\b[^$]*\$")
+ASCII_WORD_IN_MATH_RE = re.compile(r"(?<!\\)\b[A-Za-z]{3,}\b")
+_MATH_ENV_RE = re.compile(r"\$[^$\n]*\$")
 NUMBER_IN_MATH_RE = re.compile(r"\$[^$]*\d[^$]*\$")
 YEAR_RE = re.compile(r"\b(19|20)\d{2}\b")
 PUNCT_MAP = str.maketrans({"，": ",", "。": ".", "：": ":", "；": ";", "（": "(", "）": ")"})
@@ -42,10 +43,9 @@ def classify_diff(raw: str, normalized: str) -> str:
     if added_dollars <= 0:
         return "OTHER"
     risky = (
-        bool(ASCII_WORD_IN_MATH_RE.search(normalized))
+        _ascii_word_in_math(normalized)
         or bool(YEAR_RE.search(_math_span(normalized)))
-        or bool(NUMBER_IN_MATH_RE.search(normalized))
-        and not bool(NUMBER_IN_MATH_RE.search(raw))
+        or count_standalone_numeric_wraps(raw, normalized) > 0
     )
     if risky:
         return "HIGH_RISK"
@@ -63,6 +63,15 @@ def _math_span(text: str) -> str:
 
     parts = re.findall(r"\$([^$]*)\$", text, flags=re.DOTALL)
     return " ".join(parts)
+
+
+def _ascii_word_in_math(text: str) -> bool:
+    """数学环境里出现 3 个以上字母的英文单词（排除 ``\\sin`` 这类 LaTeX 命令）。"""
+
+    for env in _MATH_ENV_RE.finditer(text):
+        if ASCII_WORD_IN_MATH_RE.search(env.group(0)):
+            return True
+    return False
 
 
 def collect(evidence_dir: pathlib.Path) -> tuple[dict[str, list[dict[str, Any]]], list[dict[str, Any]]]:

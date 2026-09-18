@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from .config import (
     ALLOWED_TEXT_PUNCTUATION,
     MARKDOWN_BOUNDARY_CHARS,
@@ -108,6 +110,21 @@ def _is_math_candidate_char(text: str, index: int, mask: list[bool]) -> bool:
 
 def _is_content_candidate(text: str, start: int, end: int) -> bool:
     return any(text[i].isalnum() or text[i] == "\\" for i in range(start, end))
+
+
+#: 孤立数字字面量：可选正负号 + 数字/千分位 + 可选小数 + 可选百分号。
+_NUMERIC_LITERAL_RE = re.compile(r"^[+-]?[\d,]+(?:\.\d+)?%?$")
+
+
+def is_standalone_numeric_literal(segment: str) -> bool:
+    """只有数字、没有任何数学结构证据的片段（例如 ``10``、``3.14``、``50%``）。
+
+    这类片段**不再自动**进入数学环境：数学意义上的数字不等于需要数学排版。
+    只有与变量、运算符、上下标、LaTeX 命令等明确数学结构共同出现时（例如 ``x=2``、
+    ``2^n``、``a_2``、``3m+4``），整个表达式才作为数学候选。
+    """
+
+    return bool(_NUMERIC_LITERAL_RE.match(segment.strip()))
 
 
 def _trim_edges(text: str, start: int, end: int) -> tuple[int, int]:
@@ -227,7 +244,11 @@ def find_math_candidate_spans(
                         break
                     i += 1
                 span_start, span_end = _trim_edges(text, run_start, i)
-                if span_end > span_start and _is_content_candidate(text, span_start, span_end):
+                if (
+                    span_end > span_start
+                    and _is_content_candidate(text, span_start, span_end)
+                    and not is_standalone_numeric_literal(text[span_start:span_end])
+                ):
                     candidate_spans.append(Span(span_start, span_end, SpanKind.TEXT))
             else:
                 i += 1

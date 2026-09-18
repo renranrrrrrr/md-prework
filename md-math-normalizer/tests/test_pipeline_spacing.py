@@ -17,7 +17,7 @@ CASES = [
     ("设 x=10 时", "设 $x=10$ 时"),
     ("设 a、b、c 为正实数", "设 $a, b, c$ 为正实数"),
     # a sentence period is not absorbed by the new math environment
-    ("结果为 10.", "结果为 $10$."),
+    ("结果为 10.", "结果为 10."),
     ("由 x_1+x_2=1 可知", "由 $x_1+x_2=1$ 可知"),
 ]
 
