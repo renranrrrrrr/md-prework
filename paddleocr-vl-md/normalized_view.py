@@ -29,6 +29,11 @@ from typing import Any, Callable, Mapping, Sequence
 
 NORMALIZED_VIEW_SCHEMA = "md-prework/normalized-view/v1"
 NORMALIZER_VERSION = "normalized-view/v1"
+#: profile 版本与 schema 分开演进（GPT 裁决）：schema 冻结在 v1，
+#: 规范化行为按 profile 版本号走，未来改 normalizer 不再升整个数据契约。
+PROFILE_VERSION_TEXT = "text_math_v1.1"
+PROFILE_VERSION_FORMULA = "formula_v1"
+PROFILE_VERSION_PRESERVE = "preserve"
 PROFILE_TEXT = "text_math_v1"
 PROFILE_FORMULA = "formula_v1"
 PROFILE_PRESERVE = "preserve"
@@ -68,6 +73,14 @@ def profile_for_label(label: str) -> str:
     if label in FORMULA_LABELS:
         return PROFILE_FORMULA
     return PROFILE_PRESERVE
+
+
+def profile_version(profile: str) -> str:
+    if profile == PROFILE_TEXT:
+        return PROFILE_VERSION_TEXT
+    if profile == PROFILE_FORMULA:
+        return PROFILE_VERSION_FORMULA
+    return PROFILE_VERSION_PRESERVE
 
 
 def resolve_text_normalizer() -> tuple[Callable[[str], str] | None, str]:
@@ -115,6 +128,7 @@ def normalize_block(
     content = str(block.get("content") or "")
     profile = profile_for_label(label)
     entry: dict[str, Any] = {"block_ref": block_ref, "label": label, "profile": profile}
+    entry["profile_version"] = profile_version(profile)
 
     if profile == PROFILE_PRESERVE:
         entry.update({"status": STATUS_UNCHANGED, "actions": [], "diagnostics": []})
