@@ -20,7 +20,7 @@
 | `pdf2md.cmd` | 只跑 OCR 的包装脚本 |
 | `requirements.txt` | 唯一依赖 `paddleocr-mcp>=0.8.5`（不装 paddlepaddle） |
 | `.venv/` | 独立虚拟环境 |
-| `tests/` | 调度器 / 限流 / 冷却恢复 / 图片导出 / 证据 / 规范化 / 语义链自动测试（195 项，全部离线，不触碰远端与模型） |
+| `tests/` | 调度器 / 限流 / 冷却恢复 / 图片导出 / 证据 / 规范化 / 语义链 / 语义覆盖不变量自动测试（208 项，全部离线，不触碰远端与模型） |
 
 ## 唯一 producer：OCR → 结构化证据
 
@@ -242,14 +242,15 @@ python -m venv .venv
 
 ## 令牌
 
-脚本按以下顺序查找令牌：
+脚本按以下顺序查找令牌（`ocr_producer.resolve_token`）：
 
 1. `--token` 命令行参数
-2. 进程环境变量 `PADDLEOCR_MCP_AISTUDIO_ACCESS_TOKEN`
-3. **用户级**环境变量 `PADDLEOCR_MCP_AISTUDIO_ACCESS_TOKEN`（直接读注册表）
+2. 环境变量 `PADDLEOCR_API_KEY`：先查**进程级**，查不到再读**用户级**（直接读注册表）
+3. 旧名 `PADDLEOCR_MCP_AISTUDIO_ACCESS_TOKEN`：同样进程级 → 用户级两级兜底
 
-第 3 条是兜底：刚设置的用户变量不会进入已经在运行的终端或工具，脚本自己查注册表，
-所以无需重启终端。
+第 3 条只是为了兼容早期配置，新环境请设 `PADDLEOCR_API_KEY`。用户级兜底的意义：
+刚设置的用户变量不会进入已经在运行的终端或工具，脚本自己查注册表，所以无需重启终端。
+`prework_ocr.py` 还可用 `--token-env`（可重复）自定义变量名与顺序。
 
 ## 用法
 

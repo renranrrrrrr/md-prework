@@ -1,6 +1,7 @@
 # md-prework 交接文档
 
-> 最后更新：2026-09-18 ｜ 交接版本：**main @ `b2f23ca`**（本文档所在提交；上一个功能提交 `1f7901e`，milestone tag `prework-semantic-foundation-v1` → `cf13a1c`）
+> 最后更新：2026-09-19 ｜ 交接版本：以 `git log -1` 为准（本文档不再抄自己的 sha，改一行就过期）；
+> 最近一个功能提交 `e6f1214`（silent_loss 修复），milestone tag `prework-semantic-foundation-v1` → `cf13a1c`
 > 适用读者：接手本仓库继续开发的工程师（假定熟悉 Python / pytest / 命令行，不假定了解历史决策）
 
 ---
@@ -43,7 +44,7 @@ PDF ──▶ OCR Producer ──▶ OCR Evidence（不可变） ──▶ Norma
 | --- | --- |
 | 远端 | `https://github.com/renranrrrrrr/md-prework.git` |
 | 默认分支 | `main` |
-| 当前 main | `1f7901e`（本轮 baseline 工具改进） |
+| 当前 main | 以 `git log -1` 为准（本表不抄 sha）；milestone tag 见下一行 |
 | milestone tag | `prework-semantic-foundation-v1` → `cf13a1c` |
 | 已删除的远端分支 | `temp`（其内容已并入 main）、`codex/problembank-ocr-producer`（重复 producer，已废弃） |
 | 本地开发副本 | `D:\Documents\ProblemBank\tmp\mdprework`（该目录被 ProblemBank 仓库 gitignore，不属于 ProblemBank 的版本控制） |
@@ -125,7 +126,7 @@ semantic_baseline.run_document()
 | `semantic_prompt.py` | system 提示模板 + 响应解析（去代码围栏）+ 非法响应重试 |
 | `semantic_provider_deepseek.py` | DeepSeek provider（Responses API + JSON Schema structured output，含 token 用量留档） |
 | `semantic_reconcile.py` | overlap reconcile（冲突降级 `UNCERTAIN`）+ 自适应扩窗触发 A–F |
-| `semantic_assembler.py` | SPLIT anchor 解析（重复不切）+ Problem Candidate 物化（只存引用、`excluded` 全登记） |
+| `semantic_assembler.py` | SPLIT anchor 解析（重复不切）+ Problem Candidate 物化（只存引用、`excluded` 全登记）+ `unaccounted_blocks`（覆盖记账，硬门与工具共用的唯一判据） |
 | `semantic_chain.py` | 零模型端到端链（窗口 → 预测 → reconcile → 扩窗 → split → assembler） |
 | `semantic_baseline.py` | baseline 运行器：`--provider fake/deepseek`、`--jobs`、断点续跑、逐窗留档、硬门统计 |
 
@@ -139,13 +140,14 @@ semantic_baseline.run_document()
 | `tools/weak_question_alignment.py` | 与旧重建结果的弱对齐（block span 分布） |
 | `tools/weak_alignment_anomalies.py` | 弱对齐异常定性（ALIGNMENT_DRIFT / SOLUTION_BLEED / …） |
 | `tools/normalizer_diff_audit.py` | Normalizer 改动分桶（HIGH_RISK / WRAP_MATH_ONLY / …）+ `standalone_numeric_wraps` |
+| `tools/semantic_replay_audit.py` | 离线重放归档的 `semantic-run.json`（用已记录的 predictions 再过一遍 reconcile+assembler），审计覆盖不变量；**不调用任何模型、零成本** |
 | `tools/block_evidence_benchmark.py` 等 | 全部离线可复跑 |
 
 ### 4.4 测试
 
 | 目录 | 数量 | 命令 |
 | --- | --- | --- |
-| `paddleocr-vl-md/tests/` | **195 项** | `python -m pytest tests -q`（全部离线，不触网/不调模型） |
+| `paddleocr-vl-md/tests/` | **208 项** | `python -m pytest tests -q`（全部离线，不触网/不调模型；其中 `test_wrapper_loss_regression` 需要装了 `paddleocr_mcp` 的环境，缺包会报 ModuleNotFound 而不是逻辑失败） |
 | `md-math-normalizer/tests/` | **154 项** | `$env:PYTHONPATH="src"; python -m pytest -q -o addopts=""`（该 env 里没装 pytest-timeout） |
 
 ---
@@ -313,9 +315,10 @@ cd D:\Documents\ProblemBank\tmp\mdprework\paddleocr-vl-md
 # 6) 工具
 & $py tools/block_evidence_benchmark.py --evidence-dir <dir> --output <r.json> --markdown <r.md>
 & $py tools/normalizer_diff_audit.py --evidence-dir <dir> --output <r.json> --markdown <r.md>
+& $py tools/semantic_replay_audit.py --run-dir <语义产物目录>   # 重放归档预测审计覆盖不变量（退出码 0 = 无静默丢失）
 
 # 7) 测试
-& $py -m pytest tests -q                       # md-prework：195 项
+& $py -m pytest tests -q                       # md-prework：208 项
 cd ..\md-math-normalizer; $env:PYTHONPATH="src"; & $py -m pytest -q -o addopts=""   # 154 项
 ```
 
@@ -355,7 +358,7 @@ cd ..\md-math-normalizer; $env:PYTHONPATH="src"; & $py -m pytest -q -o addopts="
 | UNCERTAIN 条目 | 569 |
 | role 冲突 / boundary 冲突 | 576 / 66（18/18 文档有冲突） |
 | split | resolved 133、ambiguous 0、not_found 3 |
-| **silent_loss** | **15** ⚠️（未修，见第 10 节） |
+| **silent_loss** | **15**（当时未修；已由 `e6f1214` 修复，重放后 **0**，见第 10 节） |
 | 非法响应 | **2 / 742**（均重试成功） |
 | 扩窗触发（未执行扩窗调用） | OVERLAP_CONFLICT 408、TAIL 395、HEAD 349、MODEL_UNCERTAIN 327、SIGNAL_CONFLICT 190、EDGE_SPLIT 70 |
 
@@ -369,9 +372,16 @@ cd ..\md-math-normalizer; $env:PYTHONPATH="src"; & $py -m pytest -q -o addopts="
 
 ## 10. 已知问题与待办（按优先级）
 
-1. **`silent_loss = 15`（must-fix）**：有 15 个块既没被候选引用、也没进 `excluded`、也没有诊断。
-   已知样例：`mock_02 p0004:b0011`、`mock_04 p0004:b0006`、`mock_06 p0001:b0016`。
-   定位方式：用 `semantic_baseline.run_document` 里的 gate 逻辑逐个文档重算，检查是不是 `UNCERTAIN` 角色块在 split 拆分后丢失登记。
+1. **`silent_loss = 15`（已修复，`e6f1214`）**：那 15 个块既没被候选引用、也没进 `excluded`、也没有诊断。
+   根因只有一条：`assemble()` 把 `SHARED_CONTEXT` 攒在 `pending_shared` 里等"其后第一道题"，
+   最后一道题之后出现的共享材料永远等不到，于是随函数返回一起蒸发（已知样例
+   `mock_02 p0004:b0011`、`mock_04 p0004:b0006`、`mock_06 p0001:b0016` 全是这一类，角色都是 `SHARED_CONTEXT`）。
+   现在无题可归属的共享材料登记为 `excluded.reason = unattached_shared_context` + 同名诊断。
+   复验方式（零成本，不调模型）：`python tools/semantic_replay_audit.py --run-dir <blocks_20260918>`
+   → HEAD 15 / 修复后 0，且 18 份文档的候选引用结构与修复前逐一相同。
+   顺带修掉一个同源隐患：split 物化时 `for candidate in candidates` 遍历的正是被追加的那个列表，
+   anchor 落在块首（`start = 0`）会让新候选被自己再切一次并无限增长——真实数据没撞上，
+   `tests/test_semantic_no_silent_loss.py` 的全组合扫描能稳定复现。
 2. **成本大头是推理 token（88.8%）**，不是输入或 JSON 结构。见第 11 节的门。
 3. **前 8 份文档没有 usage 记录**（当时还没接 `usage` 字段），所以成本只能按后 10 份外推。
 4. **9/13 扩窗调用尚未执行**：目前只记录触发原因。执行前先看触发率（很高，会让调用量翻 2–3 倍）。
@@ -446,7 +456,7 @@ cd ..\md-math-normalizer; $env:PYTHONPATH="src"; & $py -m pytest -q -o addopts="
 ```powershell
 # 1) 两边测试全绿
 cd D:\Documents\ProblemBank\tmp\mdprework\paddleocr-vl-md
-C:\Users\Administrator\.conda\envs\pb\python.exe -m pytest tests -q      # 期望 195 passed
+C:\Users\Administrator\.conda\envs\pb\python.exe -m pytest tests -q      # 期望 208 passed
 cd ..\md-math-normalizer
 $env:PYTHONPATH="src"; C:\Users\Administrator\.conda\envs\pb\python.exe -m pytest -q -o addopts=""   # 期望 154 passed
 
@@ -461,6 +471,8 @@ C:\Users\Administrator\.conda\envs\pb\python.exe tools\block_evidence_benchmark.
 C:\Users\Administrator\.conda\envs\pb\python.exe semantic_baseline.py `
   --evidence-dir <同上> --provider fake --output <tmp>\fake.json
 #  期望：hard_gates 全 true（覆盖完整 / schema 合法 / 无静默丢失 / reconcile 正常）
+#  注意：默认断点续跑会跳过已有语义产物的文档；对已跑完的目录要加 --force，
+#        否则 documents=0，"全 true" 只是空集上的真值。
 ```
 
 ---
