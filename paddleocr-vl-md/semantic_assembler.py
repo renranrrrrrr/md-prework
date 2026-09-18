@@ -26,6 +26,46 @@ _ARABIC_RE = re.compile(r"^\s*(?P<number>\d{1,3})\s*[.、]\s*")
 _CHINESE_RE = re.compile(r"^\s*(?P<number>[一二三四五六七八九十]{1,3})\s*[、.]\s*")
 
 
+def _mentions_ref(line: str, ref: str) -> bool:
+    """诊断里是否点名了该 ``block_ref``（按 ``:`` 分段匹配，不做子串碰运气）。"""
+
+    cursor = 0
+    while True:
+        found = line.find(ref, cursor)
+        if found < 0:
+            return False
+        before = line[found - 1] if found else ""
+        after = line[found + len(ref) :] or ""
+        if before in {"", ":"} and after in {"", ":"}:
+            return True
+        cursor = found + 1
+
+
+def unaccounted_blocks(
+    blocks: Sequence[Mapping[str, Any]], assembled: Mapping[str, Any]
+) -> list[str]:
+    """返回"三无"块：既没进候选、也没进 ``excluded``、也没有点名诊断。
+
+    这是 assembler 的覆盖不变量（结果必须为空）。任何新增的 role / split 分支都要先过这条。
+    """
+
+    accounted: set[str] = set()
+    for candidate in assembled.get("candidates") or []:
+        for item in (candidate.get("statement_refs") or []) + (candidate.get("solution_refs") or []):
+            accounted.add(str((item or {}).get("block_ref")))
+        accounted.update(str(ref) for ref in candidate.get("shared_refs") or [])
+    for item in assembled.get("excluded") or []:
+        accounted.add(str((item or {}).get("block_ref")))
+    diagnostics = [str(line) for line in assembled.get("diagnostics") or []]
+    refs = {str(block.get("block_ref")) for block in blocks}
+    unaccounted: list[str] = []
+    for ref in sorted(refs):
+        if ref in accounted or any(_mentions_ref(line, ref) for line in diagnostics):
+            continue
+        unaccounted.append(ref)
+    return unaccounted
+
+
 def extract_question_number(text: str) -> dict[str, str]:
     """从候选题首段文本里抽取题号；抽不到就返回空 dict（不猜）。"""
 
@@ -139,13 +179,19 @@ def assemble(
         # NON_PROBLEM / 其它非题目内容：不进入候选题，但必须登记，绝不静默丢弃
         excluded.append({"block_ref": ref, "reason": f"excluded_role:{role}"})
 
+    # 走到题尾还没有后继题目的共享材料：没有 candidate 可归属，同样必须登记
+    for ref in pending_shared:
+        diagnostics.append(f"unattached_shared_context:{ref}")
+        excluded.append({"block_ref": ref, "reason": "unattached_shared_context"})
+
     # SPLIT 只影响"块内两题"的切分：把该块按区间劈成两段引用
     for ref, split in splits.items():
         if split.get("status") != "resolved":
             diagnostics.append(f"unresolved_split:{ref}:{split.get('status')}")
             continue
         start, end = int(split["start"]), int(split["end"])
-        for candidate in candidates:
+        # 快照后遍历：下面会往 candidates 里追加，边遍历边追加会让新候选被自己再切一次
+        for candidate in list(candidates):
             for index, item in enumerate(candidate.statement_refs):
                 if item["block_ref"] == ref and item["start"] == 0:
                     block_len = item["end"]

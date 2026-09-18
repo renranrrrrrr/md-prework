@@ -18,6 +18,7 @@ import pathlib
 import sys
 from typing import Any, Callable, Mapping, Sequence
 
+import semantic_assembler as assembler
 import semantic_chain as chain
 import semantic_prediction as prediction_mod
 import semantic_prompt as prompt_mod
@@ -133,24 +134,8 @@ def run_document(
         for block in window["blocks"]
     }
     decided = set(result["reconciled"]["roles"].keys())
-    referenced = {
-        str(item.get("block_ref"))
-        for candidate in result["candidates"]["candidates"]
-        for item in candidate["statement_refs"] + candidate["solution_refs"]
-    } | {
-        str(ref)
-        for candidate in result["candidates"]["candidates"]
-        for ref in candidate["shared_refs"]
-    }
-    excluded = {
-        str(item.get("block_ref")) for item in result["candidates"].get("excluded") or []
-    }
-    diagnostics = " ".join(result["candidates"].get("diagnostics") or [])
-    silent_loss = [
-        ref
-        for ref in block_refs - referenced - excluded
-        if f":{ref}" not in diagnostics
-    ]
+    # 判据与 assembler 共用同一个记账函数，硬门不允许自带一套更宽的口径
+    silent_loss = assembler.unaccounted_blocks(document.get("blocks") or [], result["candidates"])
     gates = {
         "coverage_complete": in_windows == block_refs,
         "schema_all_valid": True,  # predict_with_retry 已在适配层校验，非法响应会重试/抛错
