@@ -77,7 +77,7 @@ def canonicalize_formula(content: str) -> tuple[str, list[dict[str, Any]]]:
     trimmed = content.strip()
     if trimmed == content:
         return content, []
-    return trimmed, [{"kind": "TRIM_WHITESPACE"}]
+    return trimmed, [{"kind": "TRIM_OUTER_WHITESPACE", "impact": "cosmetic"}]
 
 
 def normalize_block(
@@ -146,11 +146,26 @@ def normalize_block(
         {
             "status": STATUS_CHANGED if normalized != content else STATUS_UNCHANGED,
             "normalized_content": normalized,
-            "actions": [{"kind": "NORMALIZE_TEXT"}] if normalized != content else [],
+            "actions": [{"kind": "NORMALIZE_TEXT", "impact": "substantive"}]
+            if normalized != content
+            else [],
             "diagnostics": diagnostics,
         }
     )
     return entry
+
+
+def change_impact(block: Mapping[str, Any]) -> str:
+    """把一个块的 status 折成 byte / cosmetic / substantive 三档指标口径。"""
+
+    if block.get("status") == STATUS_FATAL:
+        return STATUS_FATAL
+    if block.get("status") != STATUS_CHANGED:
+        return STATUS_UNCHANGED
+    actions = block.get("actions") or []
+    if actions and all(action.get("impact") == "cosmetic" for action in actions):
+        return "cosmetic_only"
+    return "substantive_changed"
 
 
 def build_normalized_view(
@@ -177,6 +192,7 @@ def build_normalized_view(
 
 def summarize(view: Mapping[str, Any]) -> dict[str, Any]:
     per_label: dict[str, dict[str, int]] = {}
+    metrics = {"byte_changed": 0, "cosmetic_only": 0, "substantive_changed": 0, STATUS_FATAL: 0}
     idempotence_failures = 0
     for block in view.get("blocks") or []:
         label = str(block.get("label") or "")
@@ -184,6 +200,11 @@ def summarize(view: Mapping[str, Any]) -> dict[str, Any]:
             label, {STATUS_CHANGED: 0, STATUS_UNCHANGED: 0, STATUS_FATAL: 0}
         )
         bucket[str(block.get("status"))] = bucket.get(str(block.get("status")), 0) + 1
+        if block.get("status") == STATUS_CHANGED:
+            metrics["byte_changed"] += 1
+        impact = change_impact(block)
+        if impact in metrics:
+            metrics[impact] += 1
         if any(diag.get("code") == "NOT_IDEMPOTENT" for diag in block.get("diagnostics") or []):
             idempotence_failures += 1
     totals = {
@@ -194,6 +215,7 @@ def summarize(view: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "blocks": sum(totals.values()),
         "totals": totals,
+        "metrics": metrics,
         "idempotence_failures": idempotence_failures,
         "per_label": per_label,
     }

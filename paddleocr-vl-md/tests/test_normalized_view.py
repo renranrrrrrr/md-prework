@@ -92,7 +92,8 @@ def test_formula_profile_only_trims() -> None:
     formula = [b for b in view["blocks"] if b["profile"] == nv.PROFILE_FORMULA][0]
     assert formula["status"] == nv.STATUS_CHANGED
     assert formula["normalized_content"] == "x^2+y^2=1"
-    assert formula["actions"] == [{"kind": "TRIM_WHITESPACE"}]
+    assert formula["actions"] == [{"kind": "TRIM_OUTER_WHITESPACE", "impact": "cosmetic"}]
+    assert nv.change_impact(formula) == "cosmetic_only"
 
 
 def test_non_idempotent_normalizer_is_reported() -> None:
@@ -132,3 +133,6 @@ def test_summary_counts() -> None:
     assert summary["totals"][nv.STATUS_CHANGED] == 3  # 2 个 text + 1 个 formula
     assert summary["totals"][nv.STATUS_UNCHANGED] == 2
     assert summary["totals"][nv.STATUS_FATAL] == 0
+    assert summary["metrics"]["byte_changed"] == 3
+    assert summary["metrics"]["substantive_changed"] == 2, "text 块是实质变化"
+    assert summary["metrics"]["cosmetic_only"] == 1, "formula 块只有去空白"
