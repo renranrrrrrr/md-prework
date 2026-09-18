@@ -2,7 +2,7 @@
 
 支持把文件或文件夹**直接拖到** `运行全流程.cmd` 上运行。会对每个输入：
 
-    ① PDF  →（pdf2md）→ 同目录同名 .md
+    ① PDF  →（pdf2md）→ 同目录同名 .md（文档内图片默认一并导出到 <同名>_media/）
     ② .md  → 跳过 OCR
     ③ 规范化 → <同名>.规范化.md（原文件不动）
     ④ 复检规范化结果，确认是固定点
@@ -216,6 +216,8 @@ def process(
             command.append("--overwrite")
         if keep_images:
             command.append("--keep-images")
+        else:
+            command.append("--no-images")
         print("[1/4] OCR")
         code, output = run(command)
         indent(output, limit=show)
@@ -281,9 +283,7 @@ def _extract_suspicious(output: str) -> int | None:
     return None
 
 
-def main() -> int:
-    _force_utf8_console()
-
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="run_pipeline",
         description="一次性跑完 OCR → 规范化 → 可疑行标记。可把文件/文件夹拖到 运行全流程.cmd 上。",
@@ -296,7 +296,21 @@ def main() -> int:
     )
     parser.add_argument("inputs", nargs="+", help="任意多个 .pdf / .md 文件，或文件夹")
     parser.add_argument("--overwrite", action="store_true", help="覆盖已存在的 .md / .规范化.md")
-    parser.add_argument("--keep-images", action="store_true", help="OCR 时导出文档内图片")
+    # 与 pdf2md.py 保持同一套语义：默认导出，两个开关互斥。
+    images = parser.add_mutually_exclusive_group()
+    images.add_argument(
+        "--keep-images",
+        dest="keep_images",
+        action="store_true",
+        default=True,
+        help="OCR 时导出文档内图片到 <同名>_media/（默认开启，保留此参数只为兼容旧命令）",
+    )
+    images.add_argument(
+        "--no-images",
+        dest="keep_images",
+        action="store_false",
+        help="OCR 时不导出图片，只写 Markdown 文本",
+    )
     parser.add_argument(
         "--verbose",
         action="store_true",
@@ -309,7 +323,13 @@ def main() -> int:
         help="每个阶段最多打印几行诊断（默认 5）",
     )
     parser.add_argument("--no-pause", action="store_true", help="结束后不等待按键（脚本化调用用）")
-    args = parser.parse_args()
+    return parser
+
+
+def main() -> int:
+    _force_utf8_console()
+
+    args = build_parser().parse_args()
 
     tool_python = find_tool_python()
     normalizer = find_normalizer()

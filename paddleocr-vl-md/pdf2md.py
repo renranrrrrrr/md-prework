@@ -10,7 +10,9 @@
     # 模式 2：给一个或多个 PDF 文件
     python pdf2md.py "D:\\a\\1.pdf" "D:\\b\\2.pdf"
 
-输出：每个 PDF 同目录下生成同名 .md；图片（如有）写入同目录的 <同名>_media/
+输出：每个 PDF 同目录下生成同名 .md；文档内图片（如有）默认写入同目录的
+      <同名>_media/，并把 markdown 里的图片引用改写成该目录下的相对路径。
+      不需要图片时加 --no-images。
 令牌：从用户级环境变量 PADDLEOCR_MCP_AISTUDIO_ACCESS_TOKEN 读取
 """
 
@@ -245,20 +247,68 @@ def normalize_block_math(markdown: str) -> str:
     return "\n".join(line.rstrip() for line in markdown.split("\n"))
 
 
-def find_broken_image_sources(markdown: str, mapping: dict[str, str]) -> list[str]:
-    """找出仍然没有本地文件的 img src。
+_IMG_SRC_RE = re.compile(r'<img[^>]*?src="([^"]+)"')
 
-    图片下载失败时不能把引用改成不存在的本地路径，但也不能悄悄留着远端 URL：
-    调用方拿到这份清单后必须明确告知用户。
+
+def find_missing_image_sources(markdown: str, base_dir: pathlib.Path) -> list[str]:
+    """列出「还没有落到本地」的 img src。
+
+    判定规则按 Markdown 渲染器的心智模型来，不依赖任何映射表：
+
+    * ``http://`` / ``https://`` → 远端引用，没有本地化
+    * ``data:`` URL              → 已经内嵌在 markdown 里，不算缺失
+    * 其它一律当本地路径         → 相对路径相对 ``base_dir``（markdown 所在目录）
+                                   解析，文件不存在才算缺失
+
+    返回原始 src 文本，按出现顺序去重。
     """
-    broken = []
-    for match in re.finditer(r'<img[^>]*?src="([^"]+)"', markdown):
-        source = match.group(1)
-        if source in mapping:
+    missing: list[str] = []
+    seen: set[str] = set()
+
+    def _record(source: str) -> None:
+        if source not in seen:
+            seen.add(source)
+            missing.append(source)
+
+    for match in _IMG_SRC_RE.finditer(markdown):
+        source = match.group(1).strip()
+        if not source:
             continue
-        if source.lower().startswith(("http://", "https://")):
-            broken.append(source)
-    return broken
+        lowered = source.lower()
+        if lowered.startswith(("http://", "https://")):
+            _record(source)
+            continue
+        if lowered.startswith("data:"):
+            continue
+        candidate = pathlib.Path(source)
+        if not candidate.is_absolute():
+            candidate = base_dir / candidate
+        if not candidate.exists():
+            _record(source)
+    return missing
+
+
+def _warn_unlocalized_images(md_path: pathlib.Path) -> None:
+    """跳过已存在的 markdown 时，报告里面还有哪些图没有落盘。
+
+    图片默认导出，但跳过分支不会重新下载图片。如果这份 markdown 里仍有远端引用
+    或指向不存在的本地文件，就明确说清补存办法，免得用户以为图片已经落地。
+    """
+    try:
+        markdown = md_path.read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        print(f"  [警告] 无法读取 {md_path.name} 检查图片状态：{exc}")
+        return
+
+    missing = find_missing_image_sources(markdown, md_path.parent)
+    if not missing:
+        return
+    print(f"  [警告] 当前 Markdown 有 {len(missing)} 张图没落盘（远端引用或指向不存在的文件）：")
+    for source in missing[:5]:
+        print(f"          {source}")
+    if len(missing) > 5:
+        print(f"          …（另有 {len(missing) - 5} 条）")
+    print("         加 --overwrite 重跑即可补齐。")
 
 
 def rewrite_image_sources(markdown: str, mapping: dict[str, str]) -> str:
@@ -331,6 +381,8 @@ async def convert_one(
     md_path = pdf.with_suffix(".md")
     if md_path.exists() and not overwrite:
         print(f"  [跳过] 已存在：{md_path.name}（需要覆盖请加 --overwrite）")
+        if keep_images:
+            _warn_unlocalized_images(md_path)
         return True
 
     infer = create_inference(
@@ -363,10 +415,10 @@ async def convert_one(
         note += f"，{len(mapping)}/{len(result.images_mapping)} 张图 -> {media_dir.name}/"
         for failure in failures:
             print(f"  [警告] {failure}")
-        for broken in find_broken_image_sources(markdown, mapping):
-            print(f"  [警告] 这张图没能保存到本地，markdown 里仍指向远端：{broken}")
+        for missing in find_missing_image_sources(markdown, md_path.parent):
+            print(f"  [警告] 这张图没能保存到本地，markdown 里的引用会失效：{missing}")
     elif result.images_mapping:
-        note += f"，{len(result.images_mapping)} 张图（未落盘，加 --keep-images 可导出）"
+        note += f"，{len(result.images_mapping)} 张图（--no-images 已关闭导出，未落盘）"
 
     md_path.write_text(markdown, encoding="utf-8")
     print(f"  [完成] {pdf.name} -> {md_path.name}（{note}）")
@@ -447,10 +499,20 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="已存在同名 .md 时覆盖（默认跳过）",
     )
-    parser.add_argument(
+    # 图片默认导出：两个开关互斥，避免「靠出现顺序决定谁生效」这种歧义。
+    images = parser.add_mutually_exclusive_group()
+    images.add_argument(
         "--keep-images",
+        dest="keep_images",
         action="store_true",
-        help="把文档内图片导出到 <同名>_media/（默认只写 markdown 文本）",
+        default=True,
+        help="把文档内图片导出到 <同名>_media/（默认开启，保留此参数只为兼容旧命令）",
+    )
+    images.add_argument(
+        "--no-images",
+        dest="keep_images",
+        action="store_false",
+        help="不导出图片，只写 markdown 文本",
     )
     parser.add_argument(
         "--poll-timeout",

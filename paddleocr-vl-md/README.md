@@ -17,7 +17,7 @@
 | `pdf2md.cmd` | 只跑 OCR 的包装脚本 |
 | `requirements.txt` | 唯一依赖 `paddleocr-mcp>=0.8.5`（不装 paddlepaddle） |
 | `.venv/` | 独立虚拟环境 |
-| `tests/` | 调度器 / 限流 / 冷却恢复自动测试（96 项，假 worker + 虚拟时钟，不触碰远端） |
+| `tests/` | 调度器 / 限流 / 冷却恢复 / 图片导出自动测试（127 项，假 worker + 虚拟时钟，不触碰远端） |
 
 完整的工程流程与规则顺序见同级规范化器项目的 [`../md-math-normalizer/docs/全流程设计文档.md`](../md-math-normalizer/docs/全流程设计文档.md)，
 技术细节与实测数据见 [`../md-math-normalizer/docs/技术报告.md`](../md-math-normalizer/docs/技术报告.md)。
@@ -47,7 +47,8 @@
 | 选项 | 说明 |
 | --- | --- |
 | `--overwrite` | 覆盖已存在的 `.md` / `.规范化.md` |
-| `--keep-images` | OCR 时导出文档内图片 |
+| `--no-images` | OCR 时不导出图片（**默认导出**文档内图片到 `<同名>_media/`） |
+| `--keep-images` | 保留此参数只为兼容旧命令——图片默认就导出 |
 | `--verbose` | 打印全部诊断（默认每阶段只显示前 5 行） |
 | `--diagnostics-limit N` | 调整每阶段显示行数 |
 | `--no-pause` | 结束不等待按键（脚本调用用） |
@@ -78,7 +79,8 @@
 | `--launch-interval S` | 两次启动新 worker 之间的最小间隔秒数，默认 `0.5`；`0` 表示不间隔（测试/本地服务用） |
 | `--verbose` | worker 打印全部诊断 |
 | `--overwrite` | 覆盖已存在的产物 |
-| `--keep-images` | OCR 时导出文档内图片 |
+| `--no-images` | OCR 时不导出图片（**默认导出**到 `<同名>_media/`） |
+| `--keep-images` | 保留此参数只为兼容旧命令——图片默认就导出 |
 
 `--workers > 4` 会给出一行告警（不阻塞执行）：远端 OCR 是共享配额服务，
 并发开太大只会把限流触发得更早，建议先用默认 2 跑通再调。
@@ -206,17 +208,20 @@ D:\Users\lenovo\Documents\1\2.pdf   → 不会转
 
 ```text
 D:\试卷\第一套.pdf        →  D:\试卷\第一套.md
-D:\试卷\第一套_media\     （加了 --keep-images 且文档含图时才有）
+D:\试卷\第一套_media\     （文档含图时自动生成；用 --no-images 可关掉）
 ```
 
 已存在同名 `.md` 时默认**跳过**，不覆盖；要覆盖加 `--overwrite`。
+跳过的这份 markdown 里如果还有没落盘的图片（远端 URL，或指向不存在的本地文件），
+会打印一条警告，告诉你加 `--overwrite` 重跑即可补齐。
 
 ## 选项
 
 | 选项 | 说明 |
 | --- | --- |
 | `--overwrite` | 覆盖已存在的同名 `.md`（默认跳过） |
-| `--keep-images` | 把文档内图片导出到 `<同名>_media/`（默认只写 markdown 文本） |
+| `--no-images` | 不导出图片，只写 markdown 文本 |
+| `--keep-images` | 把文档内图片导出到 `<同名>_media/`（**默认已开启**，保留只为兼容旧命令） |
 | `--model` | 模型名，默认 `PaddleOCR-VL-1.6` |
 | `--poll-timeout` | 单份 PDF 总轮询超时秒数，默认 900 |
 | `--retries` | 遇到配额/排队错误时的总尝试次数，默认 3 |
@@ -241,17 +246,26 @@ AI Studio 是共享服务，报错通常来自服务端而不是脚本：
 
 ## 图片导出说明
 
-文档解析会同时返回正文图片。默认只写 markdown 文本、**不落盘图片**（避免意外生成大量文件）；
-加 `--keep-images` 才导出到 `<同名>_media/`，并按原路径保留子目录结构，同时把 markdown 里
-`<img src="...">` 的路径改写成实际位置（只改 `src` 属性取值，不动其它内容）。
+文档解析会同时返回正文图片。**图片默认导出**到 `<同名>_media/`：按原路径保留子目录结构，
+同时把 markdown 里 `<img src="...">` 的路径改写成实际位置（只改 `src` 属性取值，不动其它内容）。
+不想要图片就加 `--no-images`，此时只写 markdown 文本；旧的 `--keep-images` 仍然可用
+（它现在只是"本来就有的默认值"的显式写法）。
 
 导出行为要点：
 
 - 图片托管在 CDN 上，AI Studio 返回的是**图片 URL**（本地推理返回 base64，两者都支持）；
   URL 下载失败会**退避重试 3 次**，避免把偶发的 SSL 抖动变成永久缺失。
 - 落盘前按文件头校验格式，识别不出格式的负载会被跳过并报告，不会写出坏图片。
-- **下载最终失败的图片，其 markdown 引用会保留远端 URL 并打印警告**——不会把引用改成
-  不存在的本地路径。看到这类警告就要重跑一次（加 `--overwrite`）。
+- 键名后缀与真实格式不符时按文件头纠正（例如 `x.jpg` 其实是 PNG，就写 `x.png`），
+  markdown 引用同步改成纠正后的路径。
+- **下载最终失败的图片，其 markdown 引用保持原样并打印警告**——不会把引用改成不存在的
+  本地路径。看到这类警告就要重跑一次（加 `--overwrite`）。
+- 图片是否「已落盘」按统一规则判定：`http(s)` URL 算未落盘；`data:` URL 算已内嵌；
+  其余当本地路径，相对路径相对 markdown 所在目录解析，文件不存在才算未落盘。
+- 已有 `.md` 被跳过时不会重新下载图片；若按上面规则存在未落盘的图片，脚本会打印
+  `[警告] 当前 Markdown 有 N 张图没落盘…加 --overwrite 重跑即可补齐。`
+- CDN 图片下载走系统代理设置；如果本机代理挂了，会表现为全部图片下载失败（日志里是
+  连接被拒），此时临时清掉 `HTTP(S)_PROXY` 再跑即可。
 
 ## 输出规范化（pdf2md 自动做的小清理）
 
@@ -309,7 +323,7 @@ $norm  = Join-Path $tools "md-math-normalizer"        # 规范化器
 $normPy = Join-Path $norm ".venv\Scripts\python.exe"  # 用 -m 调用最稳
 
 # 1. OCR
-& "$tool\.venv\Scripts\python.exe" "$tool\pdf2md.py" "D:\试卷" --keep-images
+& "$tool\.venv\Scripts\python.exe" "$tool\pdf2md.py" "D:\试卷"    # 图片自动落盘到 <同名>_media/
 
 # 2. 标记可疑行（人工确认，工具不改文件）
 & "$tool\.venv\Scripts\python.exe" "$tool\ocr_mark.py" "D:\试卷"
@@ -328,4 +342,3 @@ $normPy = Join-Path $norm ".venv\Scripts\python.exe"  # 用 -m 调用最稳
 规范化器会：把中文标点全部换成英文标点、把公式外的裸变量与数字包进数学环境、给含大算符的
 行内公式补 `\displaystyle`，并**原样保留** OCR 的宽松公式形态。若 `$` 不配对会报退出码 2 ——
 按设计它不猜公式边界。
-

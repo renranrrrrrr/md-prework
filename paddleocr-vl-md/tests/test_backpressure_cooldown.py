@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import io
+import os
 import pathlib
 import re
 import sys
@@ -179,10 +180,13 @@ def run_schedule(
     )
     # 用规格顺序返回，便于断言
     by_name = {r.source.name: r for r in results}
-    with open(TOOL_DIR / "_cooldown_diag.txt", "a", encoding="utf-8") as handle:
-        handle.write(f"launches={launches}\n")
-        handle.write(f"results={[(r.source.name, r.returncode) for r in results]}\n")
-        handle.write(f"sleeps={clock.sleeps[:10]} events={events}\n")
+    # 诊断转储是排查调度顺序用的，默认关掉：测试跑一次就往仓库里追加一次日志
+    # 会把工作区弄脏。需要时用 `$env:MD_PIPELINE_DIAG=1` 再跑。
+    if os.environ.get("MD_PIPELINE_DIAG") == "1":
+        with open(TOOL_DIR / "_cooldown_diag.txt", "a", encoding="utf-8") as handle:
+            handle.write(f"launches={launches}\n")
+            handle.write(f"results={[(r.source.name, r.returncode) for r in results]}\n")
+            handle.write(f"sleeps={clock.sleeps[:10]} events={events}\n")
     ordered = [by_name[pdf.name] for pdf in pdfs]
     return ordered, stats, clock, launches, events
 

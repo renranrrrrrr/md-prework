@@ -237,8 +237,8 @@ def build_worker_command(
         command.append("--verbose")
     if overwrite:
         command.append("--overwrite")
-    if keep_images:
-        command.append("--keep-images")
+    # 图片默认导出；这里始终显式传一个开关，命令本身就能看出本次是存图还是丢图。
+    command.append("--keep-images" if keep_images else "--no-images")
     return command
 
 
@@ -642,7 +642,21 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--verbose", action="store_true", help="worker 打印全部诊断")
     parser.add_argument("--overwrite", action="store_true", help="覆盖已存在的产物")
-    parser.add_argument("--keep-images", action="store_true", help="OCR 时导出文档内图片")
+    # 与 pdf2md.py / run_pipeline.py 保持同一套语义：默认导出，两个开关互斥。
+    images = parser.add_mutually_exclusive_group()
+    images.add_argument(
+        "--keep-images",
+        dest="keep_images",
+        action="store_true",
+        default=True,
+        help="OCR 时导出文档内图片（默认开启，保留此参数只为兼容旧命令）",
+    )
+    images.add_argument(
+        "--no-images",
+        dest="keep_images",
+        action="store_false",
+        help="OCR 时不导出图片，只写 Markdown 文本",
+    )
     return parser
 
 
