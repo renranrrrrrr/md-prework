@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import re
 from typing import Any, Mapping, Sequence
 
 
@@ -19,6 +20,23 @@ PROBLEM_CONTINUATION = "PROBLEM_CONTINUATION"
 SOLUTION_START = "SOLUTION_START"
 SOLUTION_CONTINUATION = "SOLUTION_CONTINUATION"
 SHARED_CONTEXT = "SHARED_CONTEXT"
+
+#: 题号抽取（只作 provenance 与回归对照用，不参与身份判定）。
+_ARABIC_RE = re.compile(r"^\s*(?P<number>\d{1,3})\s*[.、]\s*")
+_CHINESE_RE = re.compile(r"^\s*(?P<number>[一二三四五六七八九十]{1,3})\s*[、.]\s*")
+
+
+def extract_question_number(text: str) -> dict[str, str]:
+    """从候选题首段文本里抽取题号；抽不到就返回空 dict（不猜）。"""
+
+    head = (text or "").strip()[:40]
+    match = _ARABIC_RE.match(head)
+    if match:
+        return {"number": match.group("number"), "numbering_system": "arabic"}
+    match = _CHINESE_RE.match(head)
+    if match:
+        return {"number": match.group("number"), "numbering_system": "chinese"}
+    return {}
 
 
 def resolve_split(text: str, anchor: str) -> dict[str, Any]:
@@ -48,6 +66,7 @@ class Candidate:
     solution_refs: list[dict[str, Any]] = field(default_factory=list)
     shared_refs: list[str] = field(default_factory=list)
     diagnostics: list[str] = field(default_factory=list)
+    number: dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -56,6 +75,7 @@ class Candidate:
             "solution_refs": list(self.solution_refs),
             "shared_refs": list(self.shared_refs),
             "diagnostics": list(self.diagnostics),
+            "number": dict(self.number),
         }
 
 
@@ -98,6 +118,7 @@ def assemble(
         if role == PROBLEM_START:
             current = _new_candidate()
             current.statement_refs.append(full_range)
+            current.number = extract_question_number(text)
             continue
         if role == PROBLEM_CONTINUATION:
             if current is None:
