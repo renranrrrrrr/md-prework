@@ -385,7 +385,7 @@ cd ..\md-math-normalizer; $env:PYTHONPATH="src"; & $py -m pytest -q -o addopts="
 | applied 的来源窗口 role | PROBLEM_START 11、PROBLEM_CONTINUATION 3 |
 | not_applied 的归档 final role | UNCERTAIN 60、SOLUTION_CONTINUATION 46、SOLUTION_START 13 |
 | 来源 PROBLEM_* → final UNCERTAIN / final SOLUTION_* | **0 / 0** |
-| 多窗口对同一块提出 split | 82 块（其中 anchor 不同 42、anchor 完全一致 40） |
+| 同一块被提出多条 split | 82 块（anchor 不同 42、anchor 完全一致 40；来自 ≥2 个窗口 71、全部来自同一个窗口 11） |
 | role 冲突的 split / 无 role 冲突但仍 not_applied | 35 / 84 |
 | not_applied 的块最终归属 | `excluded` 60、`solution` 59（applied 的 14 块全部落在 `statement`） |
 | archived vs recomputed reconcile | **一致**（18/18 文档逐字段相同） |
