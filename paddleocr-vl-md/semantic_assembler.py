@@ -74,6 +74,7 @@ def assemble(
     roles = dict(reconciled.get("roles") or {})
     splits = dict(splits or {})
     candidates: list[Candidate] = []
+    excluded: list[dict[str, str]] = []
     current: Candidate | None = None
     pending_shared: list[str] = []
     diagnostics: list[str] = []
@@ -112,8 +113,10 @@ def assemble(
             continue
         if role == "UNCERTAIN":
             diagnostics.append(f"uncertain_role:{ref}")
+            excluded.append({"block_ref": ref, "reason": "uncertain_role"})
             continue
-        # NON_PROBLEM 等：不进入候选题
+        # NON_PROBLEM / 其它非题目内容：不进入候选题，但必须登记，绝不静默丢弃
+        excluded.append({"block_ref": ref, "reason": f"excluded_role:{role}"})
 
     # SPLIT 只影响"块内两题"的切分：把该块按区间劈成两段引用
     for ref, split in splits.items():
@@ -142,5 +145,6 @@ def assemble(
         "schema_version": "md-prework/problem-candidates/v1",
         "candidate_count": len(candidates),
         "candidates": [candidate.to_dict() for candidate in candidates],
+        "excluded": excluded,
         "diagnostics": diagnostics,
     }

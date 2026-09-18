@@ -103,14 +103,50 @@ def run_document(
         for prediction in result["predictions"].values()
         for item in prediction.get("uncertain") or []
     )
+
+    # —— 第一层硬门：自洽性（GPT 裁决，268 题不作真值）——
+    block_refs = {str(block.get("block_ref")) for block in document.get("blocks") or []}
+    in_windows = {
+        str(block.get("block_ref"))
+        for window in result["windows"]
+        for block in window["blocks"]
+    }
+    decided = set(result["reconciled"]["roles"].keys())
+    referenced = {
+        str(item.get("block_ref"))
+        for candidate in result["candidates"]["candidates"]
+        for item in candidate["statement_refs"] + candidate["solution_refs"]
+    } | {
+        str(ref)
+        for candidate in result["candidates"]["candidates"]
+        for ref in candidate["shared_refs"]
+    }
+    excluded = {
+        str(item.get("block_ref")) for item in result["candidates"].get("excluded") or []
+    }
+    diagnostics = " ".join(result["candidates"].get("diagnostics") or [])
+    silent_loss = [
+        ref
+        for ref in block_refs - referenced - excluded
+        if f":{ref}" not in diagnostics
+    ]
+    gates = {
+        "coverage_complete": in_windows == block_refs,
+        "schema_all_valid": True,  # predict_with_retry 已在适配层校验，非法响应会重试/抛错
+        "assembler_no_silent_loss": not silent_loss,
+        "overlap_reconcile_ok": isinstance(result["reconciled"].get("has_conflict"), bool),
+    }
     return {
         "document_id": document.get("document_id"),
         "blocks": len(document.get("blocks") or []),
         "windows": len(result["windows"]),
+        "blocks_decided": len(decided & block_refs),
         "uncertain": uncertain,
         "expansion_reasons": reasons,
         "candidates": result["candidates"].get("candidate_count"),
         "candidate_diagnostics": len(result["candidates"].get("diagnostics") or []),
+        "silent_loss": len(silent_loss),
+        "gates": gates,
     }
 
 
@@ -119,8 +155,16 @@ def aggregate(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     for row in rows:
         for reason, count in (row.get("expansion_reasons") or {}).items():
             reasons[reason] = reasons.get(reason, 0) + int(count)
+    gates = {
+        "coverage_complete": all(row["gates"]["coverage_complete"] for row in rows),
+        "schema_all_valid": all(row["gates"]["schema_all_valid"] for row in rows),
+        "assembler_no_silent_loss": all(row["gates"]["assembler_no_silent_loss"] for row in rows),
+        "overlap_reconcile_ok": all(row["gates"]["overlap_reconcile_ok"] for row in rows),
+    }
     return {
         "schema_version": "md-prework/semantic-baseline/v1",
+        "hard_gates": gates,
+        "hard_gates_passed": all(gates.values()),
         "documents": len(rows),
         "blocks": sum(int(row.get("blocks") or 0) for row in rows),
         "windows": sum(int(row.get("windows") or 0) for row in rows),
