@@ -69,8 +69,9 @@ def _fake_provider(*_args: Any, **_kwargs: Any) -> Callable[[str, str], str]:
 class _TextProviderAdapter:
     """把 (system, user) → text 的 provider 适配成窗口级 provider。"""
 
-    def __init__(self, call: Callable[[str, str], str]) -> None:
+    def __init__(self, call: Callable[[str, str], str], artifacts_dir: pathlib.Path | None = None) -> None:
         self._call = call
+        self._artifacts_dir = artifacts_dir
         self.invalid_responses = 0
         self.retries = 0
 
@@ -79,6 +80,24 @@ class _TextProviderAdapter:
         invalid = sum(1 for record in result.attempts if not record.ok)
         self.invalid_responses += invalid
         self.retries += max(0, len(result.attempts) - 1)
+        if self._artifacts_dir is not None:
+            # 逐窗留档：请求 payload / 原始响应 / 每次尝试 / 解析后的预测
+            self._artifacts_dir.mkdir(parents=True, exist_ok=True)
+            record = {
+                "window_id": window.get("window_id"),
+                "window_size": window.get("window_size"),
+                "system": prompt_mod.SYSTEM_PROMPT,
+                "user": prompt_mod.build_user_message(window),
+                "attempts": [
+                    {"attempt": a.attempt, "ok": a.ok, "error": a.error, "raw": a.raw}
+                    for a in result.attempts
+                ],
+                "prediction": result.prediction,
+                "usage": getattr(self._call, "last_usage", None),
+            }
+            (self._artifacts_dir / f"{window.get('window_id')}.json").write_text(
+                json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+            )
         return result.prediction
 
 
@@ -90,9 +109,10 @@ def run_document(
     window_size: int = windowing.DEFAULT_WINDOW_SIZE,
     stride: int = windowing.DEFAULT_STRIDE,
     dump_dir: pathlib.Path | None = None,
+    call_artifacts_dir: pathlib.Path | None = None,
 ) -> dict[str, Any]:
     document = windowing.load_document(evidence_path, view_path)
-    provider = provider_factory()
+    provider = provider_factory(call_artifacts_dir) if call_artifacts_dir is not None else provider_factory()
     result = chain.run_chain(document, provider, window_size=window_size, stride=stride)
 
     reasons: dict[str, int] = {}
@@ -158,7 +178,13 @@ def run_document(
             "candidates": result["candidates"],
             "prompt_version": prompt_mod.SYSTEM_PROMPT[:60],
         }
-        (dump_dir / "semantic-run.json").write_text(
+        # 旧布局下多份文档共用一个目录：文件名带上文档标识，避免互相覆盖
+        dump_name = (
+            "semantic-run.json"
+            if dump_dir.name == "semantic"
+            else f"{evidence_path.name.replace('.evidence.json', '')}.semantic-run.json"
+        )
+        (dump_dir / dump_name).write_text(
             json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )
     return {
@@ -209,6 +235,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--token", default="")
     parser.add_argument("--output", required=True)
     parser.add_argument("--dump-dir", default="", help="把每份的窗口/预测/候选落盘（困难样本留档）")
+    parser.add_argument("--jobs", type=int, default=1, help="并发处理的文档数（真实 provider 建议 4）")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="重跑已有语义产物的文档（默认断点续跑：已有产物就跳过，避免重复计费）",
+    )
     parser.add_argument("--window-size", type=int, default=windowing.DEFAULT_WINDOW_SIZE)
     parser.add_argument("--stride", type=int, default=windowing.DEFAULT_STRIDE)
     args = parser.parse_args(argv)
@@ -219,35 +251,60 @@ def main(argv: list[str] | None = None) -> int:
             pass
 
     if args.provider == "fake":
-        factory = lambda: _TextProviderAdapter(_fake_provider())  # noqa: E731
+        factory = lambda artifacts=None: _TextProviderAdapter(_fake_provider(), artifacts)  # noqa: E731
     else:
         import semantic_provider_deepseek as ds
 
         token, source = ds.resolve_token(args.token)
         print(f"[baseline] provider=deepseek model={args.model} token={source}", file=sys.stderr)
-        factory = lambda: _TextProviderAdapter(  # noqa: E731
-            ds.DeepSeekResponsesProvider(token=token, model=args.model)
+        factory = lambda artifacts=None: _TextProviderAdapter(  # noqa: E731
+            ds.DeepSeekResponsesProvider(token=token, model=args.model), artifacts
+        )
+
+    import prework_paths
+    from concurrent.futures import ThreadPoolExecutor
+
+    evidence_paths = [
+        p
+        for p in prework_paths.iter_evidence(pathlib.Path(args.evidence_dir))
+        if prework_paths.view_path_for(p).is_file()
+    ]
+
+    if not args.force:
+        # 断点续跑：已有语义产物的文档直接跳过，避免把已经付过费的窗口再调一遍
+        def _done(path: pathlib.Path) -> bool:
+            semantic_dir = prework_paths.semantic_dir_for(path)
+            stem = path.name.replace(".evidence.json", "")
+            return (semantic_dir / f"{stem}.semantic-run.json").is_file() or (
+                semantic_dir / "semantic-run.json"
+            ).is_file()
+
+        skipped = [p for p in evidence_paths if _done(p)]
+        if skipped:
+            print(f"[baseline] 断点续跑：跳过已完成 {len(skipped)} 份", file=sys.stderr)
+        evidence_paths = [p for p in evidence_paths if not _done(p)]
+
+    def _run_one(evidence_path: pathlib.Path):
+        return run_document(
+            evidence_path,
+            prework_paths.view_path_for(evidence_path),
+            lambda artifacts=None: factory(artifacts),
+            window_size=args.window_size,
+            stride=args.stride,
+            dump_dir=pathlib.Path(args.dump_dir) if args.dump_dir else None,
+            # 旧布局下多份文档共用一个目录：每份单独一个 calls/<stem>/ 子目录，避免 window_id 撞车
+            call_artifacts_dir=prework_paths.semantic_dir_for(evidence_path)
+            / "calls"
+            / evidence_path.name.replace(".evidence.json", ""),
         )
 
     rows = []
-    import prework_paths
-
-    for evidence_path in prework_paths.iter_evidence(pathlib.Path(args.evidence_dir)):
-        import prework_paths
-
-        view_path = prework_paths.view_path_for(evidence_path)
-        if not view_path.is_file():
-            continue
-        rows.append(
-            run_document(
-                evidence_path,
-                view_path,
-                factory,
-                window_size=args.window_size,
-                stride=args.stride,
-                dump_dir=pathlib.Path(args.dump_dir) if args.dump_dir else None,
-            )
-        )
+    jobs = max(1, int(getattr(args, 'jobs', 1)))
+    if jobs > 1:
+        with ThreadPoolExecutor(max_workers=jobs) as pool:
+            rows = list(pool.map(_run_one, evidence_paths))
+    else:
+        rows = [_run_one(p) for p in evidence_paths]
 
     report = aggregate(rows)
     output = pathlib.Path(args.output)

@@ -22,7 +22,7 @@ import pathlib
 import sys
 import urllib.error
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Mapping
 
 import semantic_prompt as prompt_mod
@@ -141,6 +141,8 @@ class DeepSeekResponsesProvider:
     model: str = DEFAULT_MODEL
     base_url: str = DEFAULT_BASE_URL
     timeout: float = 120.0
+    #: 最近一次调用的用量（token 计费留档用；不落盘密钥）
+    last_usage: dict[str, Any] = field(default_factory=dict)
 
     def __call__(self, system: str, user: str) -> str:
         body = {
@@ -165,17 +167,38 @@ class DeepSeekResponsesProvider:
         except urllib.error.HTTPError as exc:  # 只回状态与响应体，不带上请求头
             detail = exc.read().decode("utf-8", "replace")[:400]
             raise RuntimeError(f"DeepSeek HTTP {exc.code}: {detail}") from exc
+        usage = payload.get("usage")
+        if isinstance(usage, Mapping):
+            self.last_usage = {
+                key: usage.get(key)
+                for key in (
+                    "input_tokens",
+                    "output_tokens",
+                    "total_tokens",
+                    "input_tokens_details",
+                    "output_tokens_details",
+                )
+                if usage.get(key) is not None
+            }
         return _extract_text(payload)
 
 
 def _extract_text(payload: Mapping[str, Any]) -> str:
-    """从 Responses API 的响应里取输出文本（兼容 output_text / output[].content[]）。"""
+    """从 Responses API 的响应里取**最终答案**文本。
+
+    注意：``output`` 里除了 ``message`` 还可能有 ``reasoning`` 项，
+    后者带的是思维链（``reasoning_text``），绝不能混进解析结果。
+    """
 
     if isinstance(payload.get("output_text"), str) and payload["output_text"].strip():
         return str(payload["output_text"])
     chunks: list[str] = []
     for item in payload.get("output") or []:
+        if str((item or {}).get("type") or "") != "message":
+            continue
         for content in (item or {}).get("content") or []:
+            if str((content or {}).get("type") or "") not in {"output_text", "text"}:
+                continue
             text = (content or {}).get("text")
             if isinstance(text, str) and text.strip():
                 chunks.append(text)
@@ -223,6 +246,41 @@ def main(argv: list[str] | None = None) -> int:
     output = json.dumps(result.prediction, ensure_ascii=False, indent=2)
     if args.output:
         pathlib.Path(args.output).write_text(output + "\n", encoding="utf-8")
+
+    # 真实调用留档：请求 payload / 原始响应 / 每次尝试 / 解析后的预测
+    import prework_paths
+
+    artifacts = prework_paths.semantic_dir_for(evidence_path) / "smoke"
+    artifacts.mkdir(parents=True, exist_ok=True)
+    (artifacts / "request.json").write_text(
+        json.dumps(
+            {
+                "model": args.model,
+                "window_id": window.get("window_id"),
+                "window_size": window.get("window_size"),
+                "system": prompt_mod.SYSTEM_PROMPT,
+                "user": prompt_mod.build_user_message(window),
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (artifacts / "attempts.json").write_text(
+        json.dumps(
+            [
+                {"attempt": record.attempt, "ok": record.ok, "error": record.error, "raw": record.raw}
+                for record in result.attempts
+            ],
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (artifacts / "prediction.json").write_text(output + "\n", encoding="utf-8")
+    print(f"[deepseek] 留档：{artifacts}", file=sys.stderr)
     print(output)
     return 0
 
