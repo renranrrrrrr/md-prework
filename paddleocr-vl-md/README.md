@@ -20,9 +20,27 @@
 | `pdf2md.cmd` | 只跑 OCR 的包装脚本 |
 | `requirements.txt` | 唯一依赖 `paddleocr-mcp>=0.8.5`（不装 paddlepaddle） |
 | `.venv/` | 独立虚拟环境 |
-| `tests/` | 调度器 / 限流 / 冷却恢复 / 证据与图片校验自动测试（假 worker 与假客户端，不触碰远端） |
+| `tests/` | 调度器 / 限流 / 冷却恢复 / 图片导出 / 证据 / 规范化 / 语义链自动测试（195 项，全部离线，不触碰远端与模型） |
 
 ## 唯一 producer：OCR → 结构化证据
+
+**仓库定位**：md-prework = `OCR → Evidence → Normalized View →（可选）Semantic Layer`。
+它只负责把 PDF 变成**可复跑的证据与派生视图**；ProblemBank 不属于本仓库，两边只通过
+独立 adapter（版本化 artifact / CLI 契约）对接，本仓库里不写任何题库业务逻辑。
+
+**产物布局**（本轮起统一）：
+
+```text
+<docs>/<stem>.pdf                 # 原始 PDF（只读输入）
+<docs>/<stem>.md                  # 最终规范化成品（可直接阅读/编辑）
+<docs>/<stem>_prework/            # 全部中间产物
+    evidence.json                 # Stable Evidence（不可变，长期 source of truth）
+    normalized-view.json          # 派生视图（永不回写证据）
+    raw/                          # Paddle 原始 Markdown + 每页 raw payload
+    media/                        # 图片素材（按文件头校验后落盘）
+    semantic/                     # 语义层产物（窗口/预测/候选，预留）
+    diagnostics/                  # 运行诊断（producer.json 等）
+```
 
 两套历史 producer 已合并成一份实现（`ocr_producer.py`），入口是 `prework_ocr.py`：
 
@@ -44,22 +62,26 @@
 
 ```text
 <output-dir>/
-  <stem>.md               # Markdown 视图（图片 src 已改成本地相对路径）
-  <stem>.evidence.json    # 不可变结构化证据（md-prework/ocr-evidence/v1）
-  <stem>_raw/page-0001.json   # 每页原始 prunedResult，逐字节保留
-  <stem>_media/           # 图片按文件头校验后落盘
-  ocr_status.jsonl        # batch 模式：每份一行状态
-  ocr_summary.json        # 每次运行：汇总（含每份 pages/blocks/images/失败原因）
+  <stem>.md                       # 最终成品（图片 src 指向 <stem>_prework/media/）
+  <stem>_prework/
+      evidence.json               # 不可变结构化证据（md-prework/ocr-evidence/v1）
+      raw/page-0000.json          # 每页原始 prunedResult，逐字节保留
+      raw/paddle.md               # Paddle 原始 Markdown（未本地化改写）
+      media/…                     # 图片按文件头校验后落盘
+      semantic/                   # 语义层产物目录（预留）
+      diagnostics/producer.json   # 该文档的 producer 运行记录
+  diagnostics/ocr_status.jsonl    # batch 模式：每份一行状态
+  diagnostics/ocr_summary.json    # 每次运行：汇总（pages/blocks/images/失败原因）
 ```
 
 证据分三级（见 `capability/README.md` 的实跑证据）：
 
-1. **Stable Core**（`<stem>.evidence.json`）：`block_ref` / `provider_block_id` /
+1. **Stable Core**（`<stem>_prework/evidence.json`）：`block_ref` / `provider_block_id` /
    `provider_block_order`（Paddle 字段，可为 null）/ `sequence_index`（数组位置，事实）/
    `label` / `content` / `bbox` / `polygon` / `group_id`，以及每页的 `page_seq`、
    `page_index_source`、`coordinate_space`、`layout_detection.boxes_count`、`order_consistency`；
    **不写**解释性的 `reading_order`（留给语义层派生），也**不内嵌** provider raw；
-2. **Provider Raw Page**（`<stem>_raw/page-NNNN.json`，默认开启）：每页完整 `prunedResult`；
+2. **Provider Raw Page**（`<stem>_prework/raw/page-NNNN.json`，默认开启）：每页完整 `prunedResult`；
 3. **Heavy Binary**（`preprocessedImages` 之类）：只以引用 + sha256 形式出现，绝不内嵌 base64。
 
 `--evidence-raw` 取值：`none`（测试/轻量）、`page`（生产默认）、`full`（调试，额外落作业信封，
@@ -68,7 +90,7 @@
 
 三条不变量：
 
-1. **证据不可变**：`<stem>.evidence.json` 已存在时默认拒绝重跑（`--overwrite` 才覆盖），
+1. **证据不可变**：`<stem>_prework/evidence.json` 已存在时默认拒绝重跑（`--overwrite` 才覆盖），
    规范化、切题等任何派生结果都不得回写证据；
 2. **不伪造图片**：下载失败或文件头不认识时只登记 `state=missing` 并警告，
    绝不把 Markdown 指向不存在的本地路径；
@@ -102,7 +124,8 @@
 | 选项 | 说明 |
 | --- | --- |
 | `--overwrite` | 覆盖已存在的 `.md` / `.规范化.md` |
-| `--keep-images` | OCR 时导出文档内图片 |
+| `--no-images` | OCR 时不导出图片（**默认导出**到 `<同名>_prework/media/`） |
+| `--keep-images` | 保留此参数只为兼容旧命令——图片默认就导出 |
 | `--verbose` | 打印全部诊断（默认每阶段只显示前 5 行） |
 | `--diagnostics-limit N` | 调整每阶段显示行数 |
 | `--no-pause` | 结束不等待按键（脚本调用用） |
@@ -133,7 +156,8 @@
 | `--launch-interval S` | 两次启动新 worker 之间的最小间隔秒数，默认 `0.5`；`0` 表示不间隔（测试/本地服务用） |
 | `--verbose` | worker 打印全部诊断 |
 | `--overwrite` | 覆盖已存在的产物 |
-| `--keep-images` | OCR 时导出文档内图片 |
+| `--no-images` | OCR 时不导出图片（**默认导出**到 `<同名>_prework/media/`） |
+| `--keep-images` | 保留此参数只为兼容旧命令——图片默认就导出 |
 
 `--workers > 4` 会给出一行告警（不阻塞执行）：远端 OCR 是共享配额服务，
 并发开太大只会把限流触发得更早，建议先用默认 2 跑通再调。
@@ -261,7 +285,7 @@ D:\Users\lenovo\Documents\1\2.pdf   → 不会转
 
 ```text
 D:\试卷\第一套.pdf        →  D:\试卷\第一套.md
-D:\试卷\第一套_media\     （加了 --keep-images 且文档含图时才有）
+D:\试卷\第一套_prework\   （中间产物：raw/ media/ semantic/ diagnostics/）
 ```
 
 已存在同名 `.md` 时默认**跳过**，不覆盖；要覆盖加 `--overwrite`。
@@ -271,7 +295,8 @@ D:\试卷\第一套_media\     （加了 --keep-images 且文档含图时才有�
 | 选项 | 说明 |
 | --- | --- |
 | `--overwrite` | 覆盖已存在的同名 `.md`（默认跳过） |
-| `--keep-images` | 把文档内图片导出到 `<同名>_media/`（默认只写 markdown 文本） |
+| `--no-images` | 不导出图片，只写 markdown 文本 |
+| `--keep-images` | 把文档内图片导出到 `<同名>_prework/media/`（**默认已开启**，保留只为兼容旧命令） |
 | `--model` | 模型名，默认 `PaddleOCR-VL-1.6` |
 | `--poll-timeout` | 单份 PDF 总轮询超时秒数，默认 900 |
 | `--retries` | 遇到配额/排队错误时的总尝试次数，默认 3 |
@@ -296,9 +321,9 @@ AI Studio 是共享服务，报错通常来自服务端而不是脚本：
 
 ## 图片导出说明
 
-文档解析会同时返回正文图片。默认只写 markdown 文本、**不落盘图片**（避免意外生成大量文件）；
-加 `--keep-images` 才导出到 `<同名>_media/`，并按原路径保留子目录结构，同时把 markdown 里
-`<img src="...">` 的路径改写成实际位置（只改 `src` 属性取值，不动其它内容）。
+文档解析会同时返回正文图片。**默认导出**到 `<同名>_prework/media/`（用 `--no-images` 关闭），
+按原路径保留子目录结构，同时把 markdown 里 `<img src="...">` 的路径改写成实际位置
+（只改 `src` 属性取值，不动其它内容）。
 
 导出行为要点：
 

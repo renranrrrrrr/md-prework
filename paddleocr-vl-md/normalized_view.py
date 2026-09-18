@@ -299,7 +299,11 @@ def process_file(
         evidence, text_normalizer=text_normalizer, normalizer_source=normalizer_source
     )
     stem = evidence_path.name.removesuffix(".evidence.json")
-    target = (output_dir or evidence_path.parent) / f"{stem}.normalized.json"
+    # 新布局：证据在 <stem>_prework/evidence.json，派生视图与它同目录（normalized-view.json）
+    default_name = (
+        "normalized-view.json" if evidence_path.name == "evidence.json" else f"{stem}.normalized.json"
+    )
+    target = (output_dir or evidence_path.parent) / default_name
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(view, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return target, view
@@ -328,7 +332,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.evidence:
         paths = [pathlib.Path(args.evidence)]
     else:
-        paths = sorted(pathlib.Path(args.evidence_dir).glob("*.evidence.json"))
+        directory = pathlib.Path(args.evidence_dir)
+        paths = sorted([*directory.glob("*.evidence.json"), *directory.glob("*/evidence.json")])
     if not paths:
         print("没有找到证据文件。", file=sys.stderr)
         return 2

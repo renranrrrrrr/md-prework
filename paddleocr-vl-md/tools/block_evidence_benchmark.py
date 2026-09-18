@@ -25,6 +25,10 @@ import statistics
 import sys
 from typing import Any, Iterable, Mapping, Sequence
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+
+import prework_paths  # noqa: E402
+
 
 FORMULA_LABELS = ("display_formula", "inline_formula")
 IMAGE_LABELS = ("image", "chart")
@@ -61,7 +65,7 @@ def summarize_document(evidence_path: pathlib.Path) -> dict[str, Any]:
     """单份文档的结构统计。"""
 
     evidence = load_evidence(evidence_path)
-    raw_dir = evidence_path.parent / f"{evidence_path.name.removesuffix('.evidence.json')}_raw"
+    raw_dir = prework_paths.raw_dir_for(evidence_path)
 
     label_counts: dict[str, int] = {}
     blocks_total = 0
@@ -248,7 +252,7 @@ def main(argv: list[str] | None = None) -> int:
             pass
 
     directory = pathlib.Path(args.evidence_dir)
-    paths = sorted(directory.glob(args.pattern))
+    paths = prework_paths.iter_evidence(directory) if args.pattern == "*.evidence.json" else sorted(directory.glob(args.pattern))
     if not paths:
         print(f"没有找到证据文件：{directory}\\{args.pattern}", file=sys.stderr)
         return 2

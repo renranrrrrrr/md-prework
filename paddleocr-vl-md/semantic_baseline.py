@@ -139,6 +139,11 @@ def run_document(
     }
     if dump_dir is not None:
         dump_dir.mkdir(parents=True, exist_ok=True)
+    else:
+        import prework_paths
+
+        dump_dir = prework_paths.semantic_dir_for(evidence_path)
+        dump_dir.mkdir(parents=True, exist_ok=True)
         payload = {
             "schema_version": "md-prework/semantic-run/v1",
             "document_id": document.get("document_id"),
@@ -153,7 +158,7 @@ def run_document(
             "candidates": result["candidates"],
             "prompt_version": prompt_mod.SYSTEM_PROMPT[:60],
         }
-        (dump_dir / f"{evidence_path.name.replace('.evidence.json', '')}.semantic.json").write_text(
+        (dump_dir / "semantic-run.json").write_text(
             json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )
     return {
@@ -225,10 +230,12 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     rows = []
-    for evidence_path in sorted(pathlib.Path(args.evidence_dir).glob("*.evidence.json")):
-        view_path = evidence_path.with_name(
-            evidence_path.name.replace(".evidence.json", ".normalized.json")
-        )
+    import prework_paths
+
+    for evidence_path in prework_paths.iter_evidence(pathlib.Path(args.evidence_dir)):
+        import prework_paths
+
+        view_path = prework_paths.view_path_for(evidence_path)
         if not view_path.is_file():
             continue
         rows.append(

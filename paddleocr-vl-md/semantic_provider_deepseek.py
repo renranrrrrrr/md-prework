@@ -200,9 +200,12 @@ def main(argv: list[str] | None = None) -> int:
             pass
 
     evidence_path = pathlib.Path(args.evidence)
-    view_path = pathlib.Path(args.view) if args.view else evidence_path.with_name(
-        evidence_path.name.replace(".evidence.json", ".normalized.json")
-    )
+    if args.view:
+        view_path = pathlib.Path(args.view)
+    else:
+        import prework_paths
+
+        view_path = prework_paths.view_path_for(evidence_path)
     document = windowing.load_document(evidence_path, view_path)
     windows = prompt_mod.with_window_id(windowing.build_windows(document)) if hasattr(
         prompt_mod, "with_window_id"

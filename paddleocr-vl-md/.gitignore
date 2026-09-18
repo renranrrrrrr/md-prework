@@ -1,0 +1,16 @@
+# 虚拟环境与构建产物
+.venv/
+build/
+dist/
+*.egg-info/
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.pytest_tmp/
+
+# 本地临时/诊断文件
+.tmp_*/
+pytest-cache-files-*/
+_cooldown_diag.txt

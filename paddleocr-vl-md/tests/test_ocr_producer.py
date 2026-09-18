@@ -208,7 +208,7 @@ def test_evidence_schema_identity_and_redaction(fixture: dict, tmp_path: pathlib
     assert page["page_index_source"] == "response_sequence"
     assert page["coordinate_space"]["kind"] in {"provider_page", "preprocessed_page"}
     assert page["layout_detection"]["boxes_count"] == document.pages[0].layout_boxes_count
-    assert page["raw_ref"].endswith("paper_raw/page-0001.json")
+    assert page["raw_ref"] == "paper_prework/raw/page-0000.json"
 
     text = json.dumps(evidence, ensure_ascii=False)
     assert "raw_pruned_result" not in text, "Stable Core 不内嵌 provider raw"
@@ -393,10 +393,13 @@ def test_convert_pdf_writes_evidence_markdown_and_raw(fixture: dict, tmp_path: p
 
     assert row.status == producer.STATUS_OK
     assert (out / "mock.md").is_file()
-    evidence = json.loads((out / "mock.evidence.json").read_text(encoding="utf-8"))
+    evidence = json.loads((out / "mock_prework" / "evidence.json").read_text(encoding="utf-8"))
     assert evidence["schema_version"] == producer.EVIDENCE_SCHEMA_VERSION
     assert evidence["block_count"] == sum(EXPECTED_BLOCKS_BY_PAGE.values())
-    assert (out / "mock_raw" / "page-0000.json").is_file()
+    assert (out / "mock_prework" / "raw" / "page-0000.json").is_file()
+    assert (out / "mock_prework" / "raw" / "paddle.md").is_file(), "raw/ 必须保留 Paddle 原始 Markdown"
+    assert (out / "mock_prework" / "diagnostics" / "producer.json").is_file()
+    assert (out / "mock_prework" / "semantic").is_dir()
     assert row.blocks == evidence["block_count"]
 
     second = asyncio.run(

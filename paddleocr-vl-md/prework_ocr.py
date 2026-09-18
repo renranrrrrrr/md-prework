@@ -272,6 +272,8 @@ def _report_row(row: producer.ConvertOutcome, log) -> None:
             log(f"  [警告] 图片引用没有本地文件：{missing}")
     elif row.status == producer.STATUS_SKIPPED:
         log(f"  [跳过] {row.evidence or row.markdown}（{row.reason}）")
+        for missing in row.missing_images:
+            log(f"  [警告] 成品 md 里仍有未本地化的图片引用：{missing}（加 --overwrite 可重跑补齐）")
     else:
         log(f"  [失败] {row.error or row.reason or 'unknown'}")
 
@@ -328,10 +330,11 @@ def main(argv: list[str] | None = None) -> int:
 
     output_dir = pathlib.Path(args.output_dir)
     if rows:
+        diagnostics_dir = output_dir / "diagnostics"
         if args.command == "batch":
-            producer.write_status_log(output_dir, rows)
+            producer.write_status_log(diagnostics_dir, rows)
         producer.write_summary(
-            output_dir,
+            diagnostics_dir,
             rows,
             model=args.model,
             provider=args.provider,
@@ -344,7 +347,7 @@ def main(argv: list[str] | None = None) -> int:
         if md_path.is_file():
             print(md_path.read_text(encoding="utf-8"))
     elif rows:
-        print(str(output_dir / "ocr_summary.json"))
+        print(str(output_dir / "diagnostics" / "ocr_summary.json"))
 
     if interrupted:
         return producer.EXIT_INTERRUPTED

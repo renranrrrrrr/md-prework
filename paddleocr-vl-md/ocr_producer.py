@@ -482,8 +482,38 @@ def rewrite_image_sources(markdown: str, mapping: Mapping[str, str]) -> str:
     return _IMG_SRC_RE.sub(_replace, markdown)
 
 
+def find_missing_image_sources(markdown: str, base_dir: pathlib.Path) -> list[str]:
+    """列出「还没有本地化」的 img src，判定按 Markdown 渲染器的心智模型。
+
+    * ``http(s)://`` → 远端引用，说明没本地化；
+    * ``data:`` URL → 已经内嵌在 markdown 里，不算缺失；
+    * 其它一律当本地路径 → 相对 ``base_dir``（markdown 所在目录）解析，文件不存在才算缺失。
+
+    返回原始 src 文本，按出现顺序去重；不依赖任何映射表，因此对"图片没下载成功"和
+    "本地文件被别人删了"两种情况都成立。
+    """
+
+    missing: list[str] = []
+    seen: set[str] = set()
+    for match in re.finditer(r'<img[^>]*?src="([^"]+)"', markdown):
+        source = match.group(1).strip()
+        if not source or source in seen:
+            continue
+        lowered = source.lower()
+        if lowered.startswith("data:"):
+            continue
+        if lowered.startswith(("http://", "https://")):
+            seen.add(source)
+            missing.append(source)
+            continue
+        if not (base_dir / source.replace("/", os.sep)).is_file():
+            seen.add(source)
+            missing.append(source)
+    return missing
+
+
 def find_broken_image_sources(markdown: str, mapping: Mapping[str, str]) -> list[str]:
-    """找出仍指向远端的 img src（下载失败的图片绝不改成本地路径）。"""
+    """兼容旧名：只报"仍在映射表之外的远端引用"。"""
 
     broken: list[str] = []
     for match in re.finditer(r'<img[^>]*?src="([^"]+)"', markdown):
@@ -764,7 +794,9 @@ def build_evidence(
     for page in document.pages:
         payload = page.to_dict()
         payload["raw_ref"] = (
-            f"{source_path.stem}_raw/page-{page.page_seq + 1:04d}.json" if raw_mode != "none" else ""
+            f"{source_path.stem}_prework/raw/page-{page.page_seq:04d}.json"
+            if raw_mode != "none"
+            else ""
         )
         page_payloads.append(payload)
     return {
@@ -1018,14 +1050,25 @@ async def convert_pdf(
     started = time.monotonic()
     target_dir = output_dir or pdf.parent
     target_dir.mkdir(parents=True, exist_ok=True)
+    # 产物布局：成品 .md 留在 PDF 同目录，其余中间产物统一进 <stem>_prework/。
     md_path = target_dir / f"{pdf.stem}.md"
-    evidence_path = target_dir / f"{pdf.stem}.evidence.json"
+    prework_dir = target_dir / f"{pdf.stem}_prework"
+    evidence_path = prework_dir / "evidence.json"
+    raw_dir = prework_dir / "raw"
+    media_dir = prework_dir / "media"
+    diagnostics_dir = prework_dir / "diagnostics"
     outcome = ConvertOutcome(pdf=pdf.name, model=model, token_source=token_source)
 
     if write_evidence_file and evidence_path.exists() and not overwrite:
         outcome.status = STATUS_SKIPPED
         outcome.reason = "evidence_exists"
-        outcome.evidence = evidence_path.name
+        outcome.evidence = str(evidence_path.relative_to(target_dir).as_posix())
+        # 跳过时仍然检查成品 md 里有没有"还没本地化"的图片，提示可用 --overwrite 补齐
+        if md_path.is_file():
+            outcome.markdown = md_path.name
+            outcome.missing_images = find_missing_image_sources(
+                md_path.read_text(encoding="utf-8"), target_dir
+            )
         outcome.duration_seconds = time.monotonic() - started
         return outcome
     if md_path.exists() and not overwrite and not write_evidence_file:
@@ -1057,7 +1100,6 @@ async def convert_pdf(
         return outcome
 
     images = document.images_mapping
-    media_dir = target_dir / f"{pdf.stem}_media"
     mapping: dict[str, str] = {}
     records: list[dict[str, Any]] = []
     failures: list[str] = []
@@ -1078,12 +1120,20 @@ async def convert_pdf(
     outcome.blocks = sum(len(page.blocks) for page in document.pages)
     outcome.images_total = len(images)
     outcome.images_saved = len(mapping)
-    outcome.media_dir = media_dir.name if images and keep_images and download else ""
-    outcome.missing_images = find_broken_image_sources(markdown, mapping)
+    outcome.media_dir = (
+        str(media_dir.relative_to(target_dir).as_posix())
+        if images and keep_images and download
+        else ""
+    )
+    # 缺图判定按渲染器心智模型（远端引用 / 本地路径不存在都算缺失）
+    outcome.missing_images = find_missing_image_sources(markdown, target_dir)
     outcome.image_failures = failures
 
     if write_evidence_file:
         mcp_version = paddleocr_mcp_version()
+        prework_dir.mkdir(parents=True, exist_ok=True)
+        for directory in (raw_dir, media_dir, prework_dir / "semantic", diagnostics_dir):
+            directory.mkdir(parents=True, exist_ok=True)
         evidence = build_evidence(
             document,
             source_path=pdf,
@@ -1096,8 +1146,11 @@ async def convert_pdf(
             mcp_version=mcp_version,
         )
         write_evidence(evidence_path, evidence, overwrite=overwrite)
-        write_raw_pages(document, target_dir / f"{pdf.stem}_raw", mode=raw_mode)
-        outcome.evidence = evidence_path.name
+        write_raw_pages(document, raw_dir, mode=raw_mode)
+        # raw/ 里同时保留 Paddle 原始 Markdown（未做本地化改写前的上游文本）
+        (raw_dir / "paddle.md").write_text(document.markdown, encoding="utf-8")
+        write_json_atomic(diagnostics_dir / "producer.json", outcome.to_dict())
+        outcome.evidence = str(evidence_path.relative_to(target_dir).as_posix())
 
     outcome.status = STATUS_OK
     outcome.duration_seconds = time.monotonic() - started

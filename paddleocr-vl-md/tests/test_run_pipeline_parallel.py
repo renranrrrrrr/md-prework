@@ -167,6 +167,20 @@ def test_worker_command_passes_flags(tmp_path):
     assert {"--verbose", "--overwrite", "--keep-images", "--no-pause"} <= set(command)
 
 
+def test_worker_command_can_drop_images(tmp_path):
+    """图片默认导出；关掉时要显式传 --no-images，而不是靠 worker 的隐含默认。"""
+    (pdf,) = _make_pdfs(tmp_path, "A.pdf")
+    command = rp.build_worker_command(
+        pdf,
+        python=pathlib.Path(sys.executable),
+        verbose=False,
+        overwrite=False,
+        keep_images=False,
+    )
+    assert "--no-images" in command
+    assert "--keep-images" not in command
+
+
 def test_worker_entry_exists():
     assert rp.RUN_PIPELINE.is_file(), "并发入口必须复用现有 run_pipeline.py"
 
@@ -606,11 +620,18 @@ def test_workers_one_matches_serial_worker_call(tmp_path, monkeypatch):
     """workers=1 时构造出的 worker 命令与直接调用 run_pipeline 完全一致。"""
     (pdf,) = _make_pdfs(tmp_path, "A.pdf")
     python = pathlib.Path(sys.executable)
-    parallel_command = rp.build_worker_command(
-        pdf, python=python, verbose=False, overwrite=False, keep_images=False
-    )
-    serial_command = [str(python), str(rp.RUN_PIPELINE), str(pdf), "--no-pause"]
-    assert parallel_command == serial_command
+    for keep_images, image_flag in ((True, "--keep-images"), (False, "--no-images")):
+        parallel_command = rp.build_worker_command(
+            pdf, python=python, verbose=False, overwrite=False, keep_images=keep_images
+        )
+        serial_command = [
+            str(python),
+            str(rp.RUN_PIPELINE),
+            str(pdf),
+            "--no-pause",
+            image_flag,
+        ]
+        assert parallel_command == serial_command
 
 
 def test_pdf_files_are_not_modified_by_scheduler(tmp_path, fake_launch):

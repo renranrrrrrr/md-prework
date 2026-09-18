@@ -74,6 +74,12 @@ def _ascii_word_in_math(text: str) -> bool:
     return False
 
 
+import sys as _sys
+
+_sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+import prework_paths  # noqa: E402
+
+
 def collect(evidence_dir: pathlib.Path) -> tuple[dict[str, list[dict[str, Any]]], list[dict[str, Any]]]:
     buckets: dict[str, list[dict[str, Any]]] = {
         "HIGH_RISK": [],
@@ -84,10 +90,13 @@ def collect(evidence_dir: pathlib.Path) -> tuple[dict[str, list[dict[str, Any]]]
     }
     fatals: list[dict[str, Any]] = []
     numeric_wraps = 0
-    for evidence_path in sorted(evidence_dir.glob("*.evidence.json")):
-        view_path = evidence_path.with_name(
-            evidence_path.name.replace(".evidence.json", ".normalized.json")
-        )
+    for evidence_path in prework_paths.iter_evidence(evidence_dir):
+        import sys
+
+        sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+        import prework_paths
+
+        view_path = prework_paths.view_path_for(evidence_path)
         if not view_path.is_file():
             continue
         evidence = json.loads(evidence_path.read_text(encoding="utf-8"))

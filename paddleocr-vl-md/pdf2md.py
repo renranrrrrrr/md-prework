@@ -3,7 +3,9 @@
 真正的 OCR 逻辑全部在 ``ocr_producer.py``（唯一实现）；本文件只保留历史 CLI 契约：
 
 * 位置参数：一个文件夹，或一个/多个 PDF 文件；目录只取直接子级；
-* 产物写在**PDF 同目录**：``<同名>.md`` 与 ``<同名>_media/``（加 ``--keep-images``）；
+* 产物写在**PDF 同目录**：``<同名>.md``（最终成品）与 ``<同名>_prework/``（中间产物）；
+* 文档内图片**默认导出**到 ``<同名>_prework/media/``，``--no-images`` 可关闭；
+  ``--keep-images`` 保留只为兼容旧命令（默认就是导出）；
 * 已存在同名 Markdown 时默认跳过，``--overwrite`` 覆盖；
 * 退出码：0 全部成功 / 1 有失败 / 2 输入或环境问题 / 130 中断。
 
@@ -45,11 +47,20 @@ def build_parser() -> argparse.ArgumentParser:
         "--model", default=DEFAULT_MODEL, help=f"PaddleOCR-VL 模型名（默认 {DEFAULT_MODEL}）"
     )
     parser.add_argument("--overwrite", action="store_true", help="已存在同名 .md 时覆盖（默认跳过）")
-    parser.add_argument(
+    images = parser.add_mutually_exclusive_group()
+    images.add_argument(
         "--keep-images",
+        dest="keep_images",
         action="store_true",
-        help="把文档内图片导出到 <同名>_media/（默认只写 markdown 文本）",
+        help="导出文档内图片（默认行为，保留此参数只为兼容旧命令）",
     )
+    images.add_argument(
+        "--no-images",
+        dest="keep_images",
+        action="store_false",
+        help="不导出文档内图片，只写 markdown 文本",
+    )
+    parser.set_defaults(keep_images=True)
     parser.add_argument(
         "--evidence", action="store_true", help="同时写 <同名>.evidence.json 结构化证据"
     )
@@ -116,6 +127,11 @@ async def main_async(args: argparse.Namespace) -> int:
 
         if row.status == producer.STATUS_SKIPPED:
             print(f"  [跳过] 已存在：{row.markdown or row.evidence}（需要覆盖请加 --overwrite）")
+            for missing in row.missing_images:
+                print(
+                    f"  [警告] 成品 md 里仍有未本地化的图片引用：{missing}"
+                    "（加 --overwrite 重跑即可补齐）"
+                )
             ok += 1
             continue
         if row.status != producer.STATUS_OK:
@@ -126,7 +142,7 @@ async def main_async(args: argparse.Namespace) -> int:
         if row.media_dir:
             note += f"，{row.images_saved}/{row.images_total} 张图 -> {row.media_dir}/"
         elif row.images_total:
-            note += f"，{row.images_total} 张图（未落盘，加 --keep-images 可导出）"
+            note += f"，{row.images_total} 张图（--no-images 已关闭导出，未落盘）"
         if row.evidence:
             note += f"，证据 {row.evidence}（{row.blocks} 块）"
         for failure in row.image_failures:
