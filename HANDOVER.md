@@ -21,7 +21,7 @@ PDF ──▶ OCR Producer ──▶ OCR Evidence（不可变） ──▶ Norma
 下游题库工程（ProblemBank）与它**完全独立**，两者只通过版本化 artifact / CLI 契约对接。
 
 当前状态：前三段已完成并冻结口径，第四段（语义层）已完成零模型链 + **第一轮真实 LLM baseline**，
-下一步是 schema 最小化与成本优化（详见第 11 节）。
+下一步是 semantic-v2 的 **wire protocol 压缩**与成本优化（ROLE / BOUNDARY / SPLIT 三维语义与 reconcile / assembler 规则都不在改动范围内，详见第 11 节）。
 
 ---
 
@@ -218,7 +218,11 @@ semantic_baseline.run_document()
 relation ∈ {`SAME_PROBLEM` `NEW_PROBLEM` `NOT_RELATED` `UNCERTAIN`}。
 硬约束：roles 按窗口顺序**逐块覆盖**；boundaries 覆盖**全部相邻**；不得改写正文；splits 只给**原文唯一 anchor**（不给 offset）；**不得出现数值 confidence**。
 
-> 注意：**这份 schema 正在被最小化**（见第 11 节）。改动时同步的地方：`semantic_prediction.validate_prediction`、`semantic_provider_deepseek.PREDICTION_JSON_SCHEMA`、`semantic_prompt.SYSTEM_PROMPT`、`semantic_reconcile`、`semantic_assembler`。
+> 注意：这份 **v1 schema 就是当前在跑的口径，未改动**。第 11 节规划的 semantic-v2 只压缩**传输表示**，
+> 并承诺经 `validate_v2_wire()` / `decode_v2_to_canonical()` 解回本节这个形状后再交给下游；
+> `semantic_reconcile.py` 与 `semantic_assembler.py` **不在** v2 的修改目标里（见 11.1）。
+> 真到施工那天需要改的是：`semantic_prediction.validate_prediction`、`semantic_provider_deepseek.PREDICTION_JSON_SCHEMA`、
+> `semantic_prompt.SYSTEM_PROMPT`，以及新增的 wire 层。
 
 ### 5.4 `md-prework/problem-candidates/v1`（assembler 产物）
 
@@ -417,31 +421,194 @@ cd ..\md-math-normalizer; $env:PYTHONPATH="src"; & $py -m pytest -q -o addopts="
 9. **旧布局与新布局并存**：18 份历史数据是旧布局（工具已兼容），新跑的数据走 `<stem>_prework/`。
 10. 题号抽取很朴素：只识别题首 `1.` / `一、`（`semantic_assembler.extract_question_number`），仅用于 provenance 与回归对照。
 
+**下面两条是 historical debt（登记，不顺手修）**：已对着 `origin/main`（`6d1166a`）复核，`main` 上就是这样，
+**不是 correctness 分支引入的 regression**。两条都只登记，修它们要单独开 commit，不要混进文档或实验提交。
+
+11. **`semantic_baseline --dump-dir` 不写 run artifact**：`run_document()` 里 `if dump_dir is not None:` 只做了
+    `dump_dir.mkdir()`，构造 payload 与写 `semantic-run.json` 全在 `else` 分支（默认路径 `prework_paths.semantic_dir_for()` 才写）。
+    也就是说**显式传 `--dump-dir` 时，逐窗 `calls/` 留档可能有，但汇总的 `semantic-run.json` 不会落盘**，
+    而 `semantic_replay_audit` / `semantic_split_audit` 与断点续跑判据都依赖后者。
+12. **invalid / retry 计数没进 baseline report**：`_TextProviderAdapter` 累计了 `invalid_responses` 与 `retries`，
+    但 `run_document()` 返回的 row 里没有这两个字段，`aggregate()` 也没汇总，所以最终报告只能看到逐窗 `attempts`，
+    看不到"非法响应率 / 重试率"这一层质量指标（第 9.3 节的 `非法响应 2 / 742` 是当时人工从留档数出来的，不是工具产出的字段）。
+
 ---
 
-## 11. 下一步计划（已与项目负责人确认）
+## 11. 下一步计划：semantic-v2 只优化 wire protocol（负责人已裁决）
 
-> 原则：**先拿到第一份真实 LLM baseline，不提前优化 prompt**；用"成本下降 + 结构判断质量不降"作为门的唯一判据。
+> 原则不变：**先拿到第一份真实 LLM baseline，不提前优化 prompt**；用"成本下降 + 结构判断质量不降"作为门的唯一判据。
+> 本节是**规划**，不是已完成事实。11.1–11.6 里没有一处代码施工过；`semantic-prediction/v1` 与 742 份归档预测仍是唯一在跑的口径。
 
-1. **完整报告 semantic-v1 质量与 usage/cost** —— 已完成（见第 9.3 节）。
-2. **不改 prompt 语义内容**（枚举、硬约束、正例都保留）。
-3. **`boundaries` 先审计、不先删**：利用现有 **742 个 archived semantic-v1 prediction** 离线审计 roles 与 boundaries 的信息关系（同一窗口内：仅凭有序 roles 能否唯一复原每条 boundary；归档里是否存在 roles 相同而 boundaries 不同的样本；reconcile 的 boundary 降级是否提供了 roles 降级之外的信息）。
-   **在证明 `boundaries` 不携带独立信息之前，`boundaries` 保留**在 schema、prompt 与 prediction 里。这一步零 API 调用，先于任何 v2 花费。
-4. **schema 信息最小化（v2 第一轮的唯一变量）**：
-   - 删除回显：输出不再返回 `schema` / `window_id`；
-   - 删除 `uncertain[].reason`；
-   - 输入只发：`index` + `label` + 有效文本（normalize 成功发 normalized，fatal 发 raw 并标 `fatal`）+ 必要的页断标记（`page_end`，跨页不得断题）；
-   - 同步改：`semantic_prediction` 校验、`semantic_provider_deepseek.PREDICTION_JSON_SCHEMA`、`semantic_prompt` 输出说明、`semantic_reconcile`、`semantic_assembler`（引用由位置映射回 `block_ref`）。
-   - **不含删 `boundaries`**（那是第 3 项审计通过后才单独决定的一件事）。
-   - 运行方式：**只分层抽约 30 个窗口**跑 minimal，样本必须覆盖七类：普通稳定窗口、`OVERLAP_CONFLICT`、`MODEL_UNCERTAIN`、`HEAD_CONTINUATION` / `TAIL_CONTINUATION`、提出过 split 的窗口、跨页窗口（窗口内 block 的 `page_seq` 不止一个）、`normalization_status` 为 `fatal` / `preserved` 的块所在窗口。
-     这些条件全部能从归档的 `semantic-run.json` 直接筛出（`expansion` 记了每个窗口的触发原因，block 带 `page_seq` 与 `normalization_status`），不需要重新推理。
-     归档里各层的真实规模（决定配额时必须知道，稀有层不能靠随机抽）：全部 742 窗中，无任何扩窗原因的"稳定窗"43、提出过 split 的窗口 158（共 267 条提案，其中至少一条可解析为 resolved 的窗口 157）、跨页窗口 140、含 `fatal` 块的窗口 **10**、含 `preserved` 块的窗口 **9**；触发原因计数 OVERLAP_CONFLICT 408、TAIL_CONTINUATION 395、HEAD_CONTINUATION 349、MODEL_UNCERTAIN 327、SIGNAL_CONFLICT 190、EDGE_SPLIT 70（同一窗口可有多个原因）。
-5. **A/B 对照不重跑 A 组**：**现有 742 个 archived verbose prediction 就是 A 组**，只把抽中窗口的 minimal 结果与同窗口归档的 verbose 结果对比：token/次、JSON 合法率、roles 一致率、split 一致率、reconcile 降级次数。
-   **禁止**为了让 A/B "同批调用"而重新调用 verbose。对照唯一要防的偏置是 B 组抽样偏向简单窗口——所以 B 组必须按第 4 项的分层配额选。
-6. **reasoning / `max_output_tokens` 单独一轮**：从第 4 项的样本里再固定其中 **10–20 个窗口**，只改推理档位 / 输出上限（schema 不动），量化省下的 token 与质量变化。**不与 schema 改动混成同一个变量。**
-7. **门的判据（不变）**：成本显著下降 **且** 结构判断质量不降 → 才冻结 **semantic-v2**；否则只保留已被证明无质量损失的那部分（例如 schema 最小化），回退其余实验。
+- **已完成**：semantic-v1 的质量与 usage/cost 完整报告（见第 9.3 节）。
+- **仍然冻结**：不改 prompt 的语义内容——role / boundary 枚举、硬约束、正例都保留。11.2 里"anchor 复制自 `raw`"
+  只是把现有硬约束（"不得改写正文""只给原文中唯一的 anchor 片段"）说清楚，不是放宽它。
 
-预期：第 4 项能削掉的是输出里 JSON 的那部分（约 10%），**真正的成本大头要靠第 6 项**（推理占输出 88.8%）。
+### 11.0 三个语义维度永久保留（先钉不变量，再谈压缩）
+
+| 维度 | 层次 | 取值 |
+| --- | --- | --- |
+| **ROLE** | 单个 block 的**节点属性** | `PROBLEM_START` / `PROBLEM_CONTINUATION` / `SOLUTION_START` / `SOLUTION_CONTINUATION` / `SHARED_CONTEXT` / `NON_PROBLEM` / `UNCERTAIN` |
+| **BOUNDARY** | 相邻两个 block 的**边属性** | `SAME_PROBLEM` / `NEW_PROBLEM` / `NOT_RELATED` / `UNCERTAIN`（`semantic_prediction.BOUNDARY_RELATIONS`） |
+| **SPLIT** | **节点内部**是否还有新题边界 | 只给原文唯一 anchor，不给 offset（如一个块里同时出现 `1. … 2. …`） |
+
+**BOUNDARY 不再是"可能删除"的实验变量。** 节点属性、边属性、节点内结构是三层不同次的语义；
+即使当前 742 份历史样本里 ROLE 与 BOUNDARY 高度相关，也不能据此删除 BOUNDARY。
+本仓库此后不得再出现"审计 boundaries 是否携带独立信息""若 roles 足以推导 boundaries 就删除 boundaries"
+这类把 BOUNDARY 当待删项的表述。
+
+semantic-v2 第一阶段**允许改变的只有传输表示**，共三件事：
+
+1. 输入传输表示（压缩发给 API 的字段，见 11.2）；
+2. 输出传输表示（压缩模型返回的重复 ID / ref，见 11.2）；
+3. 删除无必要的解释字段：模型不必回显 `schema`、不必回显 `window_id`、去掉 `uncertain[].reason`。
+
+**不允许改变**：ROLE、BOUNDARY、SPLIT、`UNCERTAIN` 的存在语义、prompt 的任务定义、
+deterministic reconcile 规则、deterministic assembler 规则。
+
+### 11.1 wire protocol 与 canonical representation 分离（v2 不侵入 reconcile / assembler）
+
+规划的分层是（新增的只有 validate + decode 两步）：
+
+```text
+Minimal v2 request
+        ↓
+LLM
+        ↓
+Minimal v2 response
+        ↓
+validate_v2_wire()        ← 新增：只校验 v2 传输形态
+        ↓
+decode_v2_to_canonical()  ← 新增：按窗口把 index 映射回 block_ref
+        ↓
+现有 canonical semantic prediction（就是今天 `semantic-prediction/v1` 的形状）
+        ↓
+semantic_reconcile.py     ← 不改
+        ↓
+semantic_chain.py         ← 不改（split first-one-wins 保持现状）
+        ↓
+semantic_assembler.py     ← 不改
+```
+
+因此明确四件事：
+
+- `semantic_reconcile.py` **不是** v2 protocol minimalization 的修改目标；
+- `semantic_assembler.py` **不是** v2 protocol minimalization 的修改目标；
+- split 的 **first-one-wins**（`semantic_chain.py:47`）暂不修改；
+- `problem-candidates/v1` **不修改**。
+
+这样 v2 第一轮实验只剩一个变量：**protocol representation**。
+（旧口径"schema 最小化需同步改 reconcile / assembler（引用由位置映射回 block_ref）"已作废——
+位置→`block_ref` 的映射属于 decoder，属于新增适配层，不属于 reconcile/assembler。）
+
+### 11.2 minimal wire 的方向（未施工）
+
+**输出**：删掉的是重复 ID / ref，不是 boundary 语义。
+
+```json
+{
+  "roles": ["PROBLEM_START", "PROBLEM_CONTINUATION", "SOLUTION_START"],
+  "boundaries": ["SAME_PROBLEM", "NOT_RELATED"],
+  "splits": [{ "index": 1, "anchor": "2. 已知" }],
+  "uncertain": [{ "kind": "BOUNDARY", "index": 1 }]
+}
+```
+
+- `roles[i]` 对应 `block[i]`；`boundaries[i]` 对应 `block[i] -> block[i+1]`（第 0 项就是第一对相邻块）；
+- `splits[].index` 指 block 下标，anchor 仍逐字来自原文；
+- `uncertain` 不再要求自然语言 `reason`；
+- **不要**为了更极端的压缩引入短字母枚举或整数枚举——目标是去掉重复引用，不是做二进制协议。
+
+**输入**：每个 block 一条，字段按需省略。
+
+```json
+{ "index": 2, "label": "text", "text": "规范化后的文本", "raw": "原始文本" }
+```
+
+- `index`：窗口内 0-based 位置；`label`：保留；`text`：主要语义判断文本；
+- normalized 与 raw **不同**时才额外给 `raw`，相同就不重复传；
+- `fatal` / `preserved` 等情况下 `text` 取当时真正可用的那份文本；
+- 页边界只传确实必要的 compact marker；`fatal` 标记只在必要时传。
+
+**必须解决的 SPLIT raw-anchor 冲突**（v2 的硬不变量）：v1 prompt 同时发送 `raw_text` 与 `normalized_text`
+（见 `semantic_prompt.SYSTEM_PROMPT` 列出的九个字段），而 anchor 最终是在 **`raw_text`** 上解析的
+（`semantic_chain.py:49-54` → `assembler.resolve_split(raw_text, anchor)`）。
+所以输入压缩**不能**简化成"normalize 成功就只发 normalized"：那样模型看到的文本与 assembler 查找的文本
+不是同一份，会凭空造出新的 `not_found`。规则要写成：
+
+- ROLE / BOUNDARY 主要基于 `text`；
+- **存在 `raw` 时，SPLIT anchor 必须逐字复制自 `raw`**；
+- 不存在 `raw`（两者相同）时，anchor 才复制自 `text`。
+
+### 11.3 A/B：A 组就是已归档的 742 份 verbose prediction
+
+- **严禁重新调用 verbose A 组**（742 次已付费、已归档在 `*.semantic-run.json` 与 `calls/` 里）。
+- B 组：分层抽 **约 30 个窗口**跑 minimal，样本必须覆盖九类，且**稀有层不许随机抽掉**：
+  普通稳定窗口、`OVERLAP_CONFLICT`、`MODEL_UNCERTAIN`、`HEAD_CONTINUATION`、`TAIL_CONTINUATION`、
+  提出过 SPLIT 的窗口、跨页窗口、normalization `fatal`、normalization `preserved`。
+- 各层在归档里的真实规模（配额依据，实测自 18 份 `semantic-run.json` 的 `expansion` / `page_seq` /
+  `normalization_status`）：742 窗中无任何扩窗原因的"稳定窗" **43**、提出过 split 的窗口 **158**
+  （共 267 条提案，≥1 条可解析为 resolved 的窗口 157）、跨页窗口 **140**、含 `fatal` 块的窗口 **10**、
+  含 `preserved` 块的窗口 **9**；触发原因计数 OVERLAP_CONFLICT 408、TAIL_CONTINUATION 395、
+  HEAD_CONTINUATION 349、MODEL_UNCERTAIN 327、SIGNAL_CONFLICT 190、EDGE_SPLIT 70（一窗可有多个原因）。
+
+**指标必须完整包含 BOUNDARY**，至少：input tokens、output tokens、reasoning tokens、
+total tokens / 估算成本、JSON-schema 合法率、**ROLE exact agreement**、**BOUNDARY exact agreement**、
+**SPLIT agreement**、UNCERTAIN 差异、reconcile conflict / downgrade 差异、
+最终 Problem Candidate 差异（候选数、statement refs、solution refs、excluded、diagnostics）。
+
+> **agreement ≠ accuracy**：历史 verbose prediction 只是 **reference baseline**，不是人工真值。
+> v1 与 v2 不一致时，要拿 Evidence 逐例人工审查，不得自动把 v2 判错（也不得自动把 v1 判对）。
+
+### 11.4 混合回放（mixed replay）：v2 的最终结构指标（推荐评测方式，harness 待建）
+
+对每个抽中的 minimal 窗口：
+
+1. 其余所有窗口**保持归档的 verbose prediction 不变**；
+2. 只把当前窗口替换成 minimal-v2 经 `decode_v2_to_canonical()` 得到的 canonical prediction；
+3. 离线重跑 reconcile → split 链（按现行 first-one-wins 约定）→ assembler；
+4. 与原归档 baseline 的 Problem Candidates 做 diff。
+
+这样只花约 30 次 minimal 调用，就能看到"一个窗口的 v2 差异是否真的传播到" role conflict、
+boundary conflict、split、candidate count、statement refs、solution refs、excluded、diagnostics。
+**不要**为了这个实验重新调用其余 verbose 窗口。
+
+现状（如实记录）：`tools/semantic_replay_audit.py --recompute-reconcile` 已经能做"归档 predictions →
+当前 reconcile → assembler"的离线重放，但**单窗替换 + 重跑 split 链**的 harness 还不存在，
+属于 v2 开工前的前置工作（本身零模型调用）。
+
+### 11.5 reasoning / `max_output_tokens` 必须与 protocol 分离
+
+不能同时改变 schema、reasoning effort、`max_output_tokens`、model，否则无法归因。顺序固定为：
+
+```text
+第一轮：verbose archived  vs  minimal protocol     —— 只改 protocol
+第二轮：固定 minimal protocol + 固定样本 + 固定模型，只改 reasoning 设置（10–20 窗）
+第三轮：单独研究 max_output_tokens
+```
+
+### 11.6 实验产物必须记录模型身份
+
+当前仓库 provider 的默认模型名仍是 `deepseek-v4-flash`（`semantic_provider_deepseek.DEFAULT_MODEL`），
+**本轮不改 provider、不改生产代码**。但 provider 现在只留档 `usage`
+（含 `input_tokens_details` / `output_tokens_details`），服务端响应里的实际 `model` 标识、
+response id / status 都没落盘（响应体在 `_extract_text` 之后就丢弃了）。
+semantic-v2 的实验产物必须规划记录：
+
+- requested model；
+- 服务端 response 实际返回的 model 标识；
+- usage；
+- reasoning token details（若返回）；
+- API response id / status（若可安全记录）。
+
+目的：provider alias 以后发生变化时，历史 A/B 仍可解释。
+
+### 11.7 门的判据（不变）
+
+成本显著下降 **且** 结构判断质量不降 → 才冻结 **semantic-v2**；
+否则只保留已被证明无质量损失的那部分（例如 wire 最小化），回退其余实验。
+
+预期：wire 最小化削掉的是输出里 JSON 的那部分（约 10%），**真正的成本大头要靠 11.5 的第二 / 三轮**
+（推理占输出 88.8%）。
 
 ---
 
