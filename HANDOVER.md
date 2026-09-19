@@ -425,17 +425,23 @@ cd ..\md-math-normalizer; $env:PYTHONPATH="src"; & $py -m pytest -q -o addopts="
 
 1. **完整报告 semantic-v1 质量与 usage/cost** —— 已完成（见第 9.3 节）。
 2. **不改 prompt 语义内容**（枚举、硬约束、正例都保留）。
-3. **schema 信息最小化**：
+3. **`boundaries` 先审计、不先删**：利用现有 **742 个 archived semantic-v1 prediction** 离线审计 roles 与 boundaries 的信息关系（同一窗口内：仅凭有序 roles 能否唯一复原每条 boundary；归档里是否存在 roles 相同而 boundaries 不同的样本；reconcile 的 boundary 降级是否提供了 roles 降级之外的信息）。
+   **在证明 `boundaries` 不携带独立信息之前，`boundaries` 保留**在 schema、prompt 与 prediction 里。这一步零 API 调用，先于任何 v2 花费。
+4. **schema 信息最小化（v2 第一轮的唯一变量）**：
    - 删除回显：输出不再返回 `schema` / `window_id`；
    - 删除 `uncertain[].reason`；
-   - **尝试删除 `boundaries`**：由 `roles` 确定性推导（roles 顺序固定 → 相邻关系可推）；
    - 输入只发：`index` + `label` + 有效文本（normalize 成功发 normalized，fatal 发 raw 并标 `fatal`）+ 必要的页断标记（`page_end`，跨页不得断题）；
    - 同步改：`semantic_prediction` 校验、`semantic_provider_deepseek.PREDICTION_JSON_SCHEMA`、`semantic_prompt` 输出说明、`semantic_reconcile`、`semantic_assembler`（引用由位置映射回 `block_ref`）。
-4. **A/B 验证**：固定同一组窗口（建议 mock_09 的 44 窗 + mock_13 的 48 窗，共 92 窗），verbose 与 minimal 各跑一次，比较：token/次、JSON 合法率、roles 一致率、split 一致率。
-5. **reasoning / 输出上限测试**：同组窗口试更低推理档位与 `max_output_tokens` 上限，量化省下的 token 与质量变化。
-6. **门的判据**：成本显著下降 **且** 结构判断质量不降 → 冻结 **semantic-v2**；否则只保留 schema 最小化，回退推理档位实验。
+   - **不含删 `boundaries`**（那是第 3 项审计通过后才单独决定的一件事）。
+   - 运行方式：**只分层抽约 30 个窗口**跑 minimal，样本必须覆盖七类：普通稳定窗口、`OVERLAP_CONFLICT`、`MODEL_UNCERTAIN`、`HEAD_CONTINUATION` / `TAIL_CONTINUATION`、提出过 split 的窗口、跨页窗口（窗口内 block 的 `page_seq` 不止一个）、`normalization_status` 为 `fatal` / `preserved` 的块所在窗口。
+     这些条件全部能从归档的 `semantic-run.json` 直接筛出（`expansion` 记了每个窗口的触发原因，block 带 `page_seq` 与 `normalization_status`），不需要重新推理。
+     归档里各层的真实规模（决定配额时必须知道，稀有层不能靠随机抽）：全部 742 窗中，无任何扩窗原因的"稳定窗"43、提出过 split 的窗口 158（共 267 条提案，其中至少一条可解析为 resolved 的窗口 157）、跨页窗口 140、含 `fatal` 块的窗口 **10**、含 `preserved` 块的窗口 **9**；触发原因计数 OVERLAP_CONFLICT 408、TAIL_CONTINUATION 395、HEAD_CONTINUATION 349、MODEL_UNCERTAIN 327、SIGNAL_CONFLICT 190、EDGE_SPLIT 70（同一窗口可有多个原因）。
+5. **A/B 对照不重跑 A 组**：**现有 742 个 archived verbose prediction 就是 A 组**，只把抽中窗口的 minimal 结果与同窗口归档的 verbose 结果对比：token/次、JSON 合法率、roles 一致率、split 一致率、reconcile 降级次数。
+   **禁止**为了让 A/B "同批调用"而重新调用 verbose。对照唯一要防的偏置是 B 组抽样偏向简单窗口——所以 B 组必须按第 4 项的分层配额选。
+6. **reasoning / `max_output_tokens` 单独一轮**：从第 4 项的样本里再固定其中 **10–20 个窗口**，只改推理档位 / 输出上限（schema 不动），量化省下的 token 与质量变化。**不与 schema 改动混成同一个变量。**
+7. **门的判据（不变）**：成本显著下降 **且** 结构判断质量不降 → 才冻结 **semantic-v2**；否则只保留已被证明无质量损失的那部分（例如 schema 最小化），回退其余实验。
 
-预期：第 3–4 项能削掉的是输出里 JSON 的那部分（约 10%），**真正的成本大头要靠第 5 项**（推理占输出 88.8%）。
+预期：第 4 项能削掉的是输出里 JSON 的那部分（约 10%），**真正的成本大头要靠第 6 项**（推理占输出 88.8%）。
 
 ---
 
