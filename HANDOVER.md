@@ -1,8 +1,10 @@
 # md-prework 交接文档
 
-> 最后更新：2026-09-19 ｜ 交接版本：以 `git log -1` 为准（本文档不再抄自己的 sha，改一行就过期）；
-> 最近一个功能提交 `c2e77a7`（语义记账的 token 边界 + split 越界/块首不物化），另有两个只读审计改动 `cae03ae`（replay 默认取归档 reconciled）、`14bf3c3`（split 溯源工具），milestone tag `prework-semantic-foundation-v1` → `cf13a1c`
-> 适用读者：接手本仓库继续开发的工程师（假定熟悉 Python / pytest / 命令行，不假定了解历史决策）
+> 最后更新：2026-09-19 ｜ 适用读者：接手本仓库继续开发的工程师（假定熟悉 Python / pytest / 命令行，不假定了解历史决策）
+>
+> 交接版本以 `git log -1` 为准——本文档不抄自己的 sha，也不再逐个列近期 commit（改一行就过期）。
+> 语义记账、replay 冻结语义、split 溯源审计的**现状**见第 9、10 节。
+> 历史里程碑：tag `prework-semantic-foundation-v1` → `cf13a1c`（固定的里程碑提交，不是当前 HEAD）。
 
 ---
 
@@ -218,11 +220,14 @@ semantic_baseline.run_document()
 relation ∈ {`SAME_PROBLEM` `NEW_PROBLEM` `NOT_RELATED` `UNCERTAIN`}。
 硬约束：roles 按窗口顺序**逐块覆盖**；boundaries 覆盖**全部相邻**；不得改写正文；splits 只给**原文唯一 anchor**（不给 offset）；**不得出现数值 confidence**。
 
-> 注意：这份 **v1 schema 就是当前在跑的口径，未改动**。第 11 节规划的 semantic-v2 只压缩**传输表示**，
-> 并承诺经 `validate_v2_wire()` / `decode_v2_to_canonical()` 解回本节这个形状后再交给下游；
-> `semantic_reconcile.py` 与 `semantic_assembler.py` **不在** v2 的修改目标里（见 11.1）。
-> 真到施工那天需要改的是：`semantic_prediction.validate_prediction`、`semantic_provider_deepseek.PREDICTION_JSON_SCHEMA`、
-> `semantic_prompt.SYSTEM_PROMPT`，以及新增的 wire 层。
+> 注意：**这份 v1 schema 与现有 canonical validator（`semantic_prediction.validate_prediction`）都保持不变**，
+> 仍是当前在跑的口径。第 11 节规划的 semantic-v2 只压缩**传输表示**：施工时**新增**一套独立的 v2 wire
+> request / schema / prompt / validator / decoder；模型返回的 v2 wire response 先过 `validate_v2_wire()`，
+> 再由 `decode_v2_to_canonical()` 恢复成本节这个 canonical 形状，**随后仍然调用现有
+> `semantic_prediction.validate_prediction()` 做第二层校验**（见 11.1）。
+> **不得**把现有 v1 validator、`semantic_provider_deepseek.PREDICTION_JSON_SCHEMA`、`semantic_prompt.SYSTEM_PROMPT`
+> 原地改造成 v2 wire protocol，也不要为了 v2 实验让 v1 协议从代码里消失：**v1 canonical contract 保留，
+> v2 wire contract 新增**。`semantic_reconcile.py` 与 `semantic_assembler.py` 同样不在 v2 的修改目标里。
 
 ### 5.4 `md-prework/problem-candidates/v1`（assembler 产物）
 
@@ -463,34 +468,67 @@ semantic-v2 第一阶段**允许改变的只有传输表示**，共三件事：
 3. 删除无必要的解释字段：模型不必回显 `schema`、不必回显 `window_id`、去掉 `uncertain[].reason`。
 
 **不允许改变**：ROLE、BOUNDARY、SPLIT、`UNCERTAIN` 的存在语义、prompt 的任务定义、
-deterministic reconcile 规则、deterministic assembler 规则。
+deterministic reconcile 规则、deterministic assembler 规则，
+以及**现有 canonical 层的三份契约**：`semantic_prediction.validate_prediction()`、
+v1 的 `PREDICTION_JSON_SCHEMA`、v1 的 `SYSTEM_PROMPT`——v2 只能**新增**一套并存的 wire 层，
+不得把这三份契约原地改造成 v2 形态。
 
-### 11.1 wire protocol 与 canonical representation 分离（v2 不侵入 reconcile / assembler）
+### 11.1 wire protocol 与 canonical representation 分离（两层校验，v2 不侵入 reconcile / assembler）
 
-规划的分层是（新增的只有 validate + decode 两步）：
+规划的分层是（v2 只**新增** validate + decode 两步，下游一行都不改）：
 
 ```text
 Minimal v2 request
         ↓
 LLM
         ↓
-Minimal v2 response
+Minimal v2 response         ← 第一层：wire representation
         ↓
-validate_v2_wire()        ← 新增：只校验 v2 传输形态
+validate_v2_wire()          ← 新增：只校验 v2 传输形态
         ↓
-decode_v2_to_canonical()  ← 新增：按窗口把 index 映射回 block_ref
+decode_v2_to_canonical()    ← 新增：按窗口把 index 映射回 block_ref
         ↓
 现有 canonical semantic prediction（就是今天 `semantic-prediction/v1` 的形状）
         ↓
-semantic_reconcile.py     ← 不改
+semantic_prediction.validate_prediction()   ← 保留：第二层，canonical 校验
         ↓
-semantic_chain.py         ← 不改（split first-one-wins 保持现状）
+semantic_reconcile.py       ← 不改
         ↓
-semantic_assembler.py     ← 不改
+semantic_chain.py           ← 不改（split first-one-wins 保持现状）
+        ↓
+semantic_assembler.py       ← 不改
 ```
 
-因此明确四件事：
+**两层校验都要在**：第一层只认 wire 形态，第二层继续认 canonical 形态。现有
+`semantic_prediction.validate_prediction()` 是 **canonical / v1-shape validator**，
+**不能**被改造成 v2 wire validator——那样等于把 wire protocol 与 canonical representation 又揉回一层。
+保留第二层的意义：decoder 一旦出错（role index 错位、boundary index 错位、split index 映射错误、
+`block_ref` 恢复错误、数组数量不对），仍然会被 canonical validator 拦下，而不是静默流进 reconcile。
 
+职责边界（符号名**未冻结**，下面只是说明性命名，仓库里目前都不存在）：
+
+```text
+semantic-v2 wire 层 —— 施工时【新增】
+──────────────────────────────────────────────
+build_v2_request()          构造压缩后的输入
+V2 wire JSON Schema         约束模型返回形态（说明性命名）
+V2 prompt                   任务定义不变，只改表示（说明性命名）
+validate_v2_wire()          第一层：只认 wire 形态
+decode_v2_to_canonical()    wire → canonical
+        ↓
+现有 canonical / v1 层 —— 完整【保留】，不原地改造
+──────────────────────────────────────────────
+semantic_prediction.validate_prediction()   第二层：canonical 校验
+现有 v1 semantic prediction schema（PREDICTION_JSON_SCHEMA）
+现有 v1 prompt 定义（SYSTEM_PROMPT）
+```
+
+因此明确六件事：
+
+- `semantic_prediction.validate_prediction()` **保留为第二层**，不改造为 v2 wire validator；
+- v1 的 `PREDICTION_JSON_SCHEMA` 与 `SYSTEM_PROMPT` **保留**，v2 用**新增**的 wire schema / wire prompt
+  （文档里写作 `V2_PREDICTION_JSON_SCHEMA` / `V2_SYSTEM_PROMPT` 只是**说明性命名**，仓库里目前**不存在**这两个符号，
+  未来真实命名以施工为准）；
 - `semantic_reconcile.py` **不是** v2 protocol minimalization 的修改目标；
 - `semantic_assembler.py` **不是** v2 protocol minimalization 的修改目标；
 - split 的 **first-one-wins**（`semantic_chain.py:47`）暂不修改；
@@ -501,6 +539,8 @@ semantic_assembler.py     ← 不改
 位置→`block_ref` 的映射属于 decoder，属于新增适配层，不属于 reconcile/assembler。）
 
 ### 11.2 minimal wire 的方向（未施工）
+
+下面两套 JSON 描述的是**新增 v2 wire 层**的形态，不是对 11.1 里 v1 canonical schema / prompt 的原地改写。
 
 **输出**：删掉的是重复 ID / ref，不是 boundary 语义。
 
