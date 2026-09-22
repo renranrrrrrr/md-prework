@@ -16,6 +16,7 @@ import json
 import pathlib
 import sys
 import types
+from dataclasses import replace
 
 import pytest
 
@@ -372,11 +373,19 @@ def test_quota_exhausted_is_not_retried() -> None:
 # ---------------------------------------------------------------- 端到端（假客户端）
 
 
-def test_convert_pdf_writes_evidence_markdown_and_raw(fixture: dict, tmp_path: pathlib.Path) -> None:
-    pdf = tmp_path / "mock.pdf"
+@pytest.mark.parametrize("keep_images", [False, True])
+def test_convert_pdf_writes_evidence_markdown_and_raw(
+    fixture: dict, tmp_path: pathlib.Path, keep_images: bool
+) -> None:
+    pdf = tmp_path / "mock 中文.pdf"
     pdf.write_bytes(b"%PDF-1.4 fake")
     out = tmp_path / "out"
     _FakeClient.document = _document(fixture)
+    _FakeClient.document = replace(
+        _FakeClient.document,
+        pages=tuple(replace(page, images={name: "https://cdn.invalid/image" for name in page.images})
+                    for page in _FakeClient.document.pages),
+    )
     _FakeClient.calls = []
 
     row = asyncio.run(
@@ -386,21 +395,31 @@ def test_convert_pdf_writes_evidence_markdown_and_raw(fixture: dict, tmp_path: p
             client_factory=_FakeClient,
             token="dummy",
             token_source="测试",
-            keep_images=False,
-            download=False,
+            keep_images=keep_images,
+            download=keep_images,
+            downloader=lambda _: _png_bytes(),
         )
     )
 
     assert row.status == producer.STATUS_OK
-    assert (out / "mock.md").is_file()
-    evidence = json.loads((out / "mock_prework" / "evidence.json").read_text(encoding="utf-8"))
+    md_path = out / f"{pdf.stem}.md"
+    prework = out / f"{pdf.stem}_prework"
+    assert md_path.is_file()
+    evidence = json.loads((prework / "evidence.json").read_text(encoding="utf-8"))
     assert evidence["schema_version"] == producer.EVIDENCE_SCHEMA_VERSION
     assert evidence["block_count"] == sum(EXPECTED_BLOCKS_BY_PAGE.values())
-    assert (out / "mock_prework" / "raw" / "page-0000.json").is_file()
-    assert (out / "mock_prework" / "raw" / "paddle.md").is_file(), "raw/ 必须保留 Paddle 原始 Markdown"
-    assert (out / "mock_prework" / "diagnostics" / "producer.json").is_file()
-    assert (out / "mock_prework" / "semantic").is_dir()
+    assert (prework / "raw" / "page-0000.json").is_file()
+    assert (prework / "raw" / "paddle.md").read_text(encoding="utf-8") == _FakeClient.document.markdown
+    assert (prework / "diagnostics" / "producer.json").is_file()
+    assert (prework / "semantic").is_dir()
     assert row.blocks == evidence["block_count"]
+    if keep_images:
+        assert row.images_saved > 0
+        assert row.missing_images == []
+        markdown = md_path.read_text(encoding="utf-8")
+        for asset in evidence["assets"]:
+            assert (prework / asset["file"]).read_bytes() == _png_bytes()
+            assert f'src="{prework.name}/{asset["file"]}"' in markdown
 
     second = asyncio.run(
         producer.convert_pdf(
@@ -413,6 +432,8 @@ def test_convert_pdf_writes_evidence_markdown_and_raw(fixture: dict, tmp_path: p
     )
     assert second.status == producer.STATUS_SKIPPED
     assert second.reason == "evidence_exists"
+    if keep_images:
+        assert second.missing_images == []
 
 
 def test_convert_pdf_records_missing_images(fixture: dict, tmp_path: pathlib.Path) -> None:

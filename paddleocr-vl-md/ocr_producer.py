@@ -1111,7 +1111,12 @@ async def convert_pdf(
             downloader=downloader,
             on_retry=log,
         )
-        markdown = rewrite_image_sources(markdown, mapping)
+        # 素材登记相对 evidence；成品 Markdown 位于 prework 目录的上一层。
+        markdown_mapping = {
+            source: (pathlib.PurePosixPath(prework_dir.name) / stored).as_posix()
+            for source, stored in mapping.items()
+        }
+        markdown = rewrite_image_sources(markdown, markdown_mapping)
 
     md_path.write_text(markdown, encoding="utf-8")
     outcome.markdown = md_path.name
