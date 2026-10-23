@@ -5,6 +5,9 @@ from __future__ import annotations
 import json
 import pathlib
 import sys
+from copy import deepcopy
+
+import pytest
 
 TOOL_DIR = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TOOL_DIR))
@@ -58,7 +61,9 @@ def _roles(window, roles):
 
 def test_scenario_normal_and_cross_block_problem() -> None:
     document = _document([("number", "1. 甲题"), ("text", "甲题续写"), ("number", "2. 乙题")])
-    script = lambda w: _roles(w, ["PROBLEM_START", "PROBLEM_CONTINUATION", "PROBLEM_START"][: len(w["blocks"])])
+    script = lambda w: _roles(
+        w, ["PROBLEM_START", "PROBLEM_CONTINUATION", "PROBLEM_START"][: len(w["blocks"])]
+    )
     result = chain.run_chain(document, ScriptedProvider(script), window_size=3)
     assert result["candidates"]["candidate_count"] == 2
     assert result["reconciled"]["has_conflict"] is False
@@ -95,8 +100,7 @@ def test_scenario_overlap_agreement() -> None:
     assert result["reconciled"]["has_conflict"] is False
     # 无冲突、无 UNCERTAIN；只可能因为首/尾是续写而要求扩窗（这是设计行为）
     assert all(
-        set(reasons) <= {"HEAD_CONTINUATION", "TAIL_CONTINUATION"}
-        for reasons in result["expansion"].values()
+        set(reasons) <= {"HEAD_CONTINUATION", "TAIL_CONTINUATION"} for reasons in result["expansion"].values()
     )
 
 
@@ -179,7 +183,9 @@ def test_scenario_chain_is_byte_identical() -> None:
     document = _document([("number", "1. 甲"), ("text", "续"), ("number", "2. 乙"), ("text", "续乙")])
     script = lambda w: _roles(
         w,
-        ["PROBLEM_START", "PROBLEM_CONTINUATION", "PROBLEM_START", "PROBLEM_CONTINUATION"][: len(w["blocks"])],
+        ["PROBLEM_START", "PROBLEM_CONTINUATION", "PROBLEM_START", "PROBLEM_CONTINUATION"][
+            : len(w["blocks"])
+        ],
     )
     first = json.dumps(
         chain.run_chain(document, ScriptedProvider(script), window_size=3), ensure_ascii=False, sort_keys=True
@@ -188,3 +194,72 @@ def test_scenario_chain_is_byte_identical() -> None:
         chain.run_chain(document, ScriptedProvider(script), window_size=3), ensure_ascii=False, sort_keys=True
     )
     assert first == second
+
+
+def test_chain_registers_eof_shared_context_and_leaves_input_unchanged() -> None:
+    document = _document([("text", "1. 甲题"), ("text", "共享材料")])
+    before = deepcopy(document)
+    result = chain.run_chain(
+        document, ScriptedProvider(lambda w: _roles(w, ["PROBLEM_START", "SHARED_CONTEXT"]))
+    )
+    assert result["candidates"]["diagnostic_records"] == [
+        {"code": "orphan_shared_context", "block_ref": "p0000:b0001"}
+    ]
+    assert document == before
+
+
+@pytest.mark.parametrize(
+    "anchors",
+    [
+        ["2. 乙题", "3. 丙题"],
+        ["2. 乙题", "不存在"],
+        ["2. 乙题", "题"],
+    ],
+)
+def test_conflicting_split_proposals_are_not_first_wins(anchors: list[str]) -> None:
+    document = _document([("text", "1. 甲题 2. 乙题 3. 丙题")])
+    predictions = [{"splits": [{"block_ref": "p0000:b0000", "anchor": anchor}]} for anchor in anchors]
+    resolved = chain.resolve_prediction_splits(document["blocks"], predictions)
+    assert resolved == chain.resolve_prediction_splits(document["blocks"], list(reversed(predictions)))
+    assert resolved["p0000:b0000"]["status"] == "conflict"
+
+
+def test_overlapping_windows_keep_conflicting_splits_as_diagnostics() -> None:
+    document = _document(
+        [
+            ("text", "1. 甲题"),
+            ("text", "甲续"),
+            ("text", "甲续"),
+            ("text", "甲尾 2. 乙题 3. 丙题"),
+            ("text", "续写"),
+            ("text", "解析"),
+        ]
+    )
+
+    def script(window):
+        prediction = _roles(
+            window,
+            [
+                "PROBLEM_START" if b["sequence_index"] == 0 else "PROBLEM_CONTINUATION"
+                for b in window["blocks"]
+            ],
+        )
+        prediction["splits"] = [
+            {"block_ref": "p0000:b0003", "anchor": "2. 乙题" if window["window_id"] == "w0000" else "3. 丙题"}
+        ]
+        return prediction
+
+    result = chain.run_chain(document, ScriptedProvider(script), window_size=5, stride=3)
+    assert result["splits"]["p0000:b0003"]["status"] == "conflict"
+    assert result["candidates"]["candidate_count"] == 1
+    assert "unresolved_split:p0000:b0003:conflict" in result["candidates"]["diagnostics"]
+
+
+def test_different_anchor_lengths_at_same_boundary_are_compatible() -> None:
+    document = _document([("text", "1. 甲题 2. 乙题")])
+    predictions = [
+        {"splits": [{"block_ref": "p0000:b0000", "anchor": anchor}]}
+        for anchor in ["2. 乙题", "2.", "2. 乙题"]
+    ]
+    splits = chain.resolve_prediction_splits(document["blocks"], predictions)
+    assert splits["p0000:b0000"] == {"status": "resolved", "start": 6, "end": 8}

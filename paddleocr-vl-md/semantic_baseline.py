@@ -18,8 +18,8 @@ import pathlib
 import sys
 from typing import Any, Callable, Mapping, Sequence
 
+import semantic_assembler as assembler
 import semantic_chain as chain
-import semantic_prediction as prediction_mod
 import semantic_prompt as prompt_mod
 import semantic_window as windowing
 
@@ -120,73 +120,57 @@ def run_document(
         for reason in items:
             reasons[reason] = reasons.get(reason, 0) + 1
     uncertain = sum(
-        1
-        for prediction in result["predictions"].values()
-        for item in prediction.get("uncertain") or []
+        1 for prediction in result["predictions"].values() for item in prediction.get("uncertain") or []
     )
 
     # —— 第一层硬门：自洽性（GPT 裁决，268 题不作真值）——
     block_refs = {str(block.get("block_ref")) for block in document.get("blocks") or []}
-    in_windows = {
-        str(block.get("block_ref"))
-        for window in result["windows"]
-        for block in window["blocks"]
-    }
+    in_windows = {str(block.get("block_ref")) for window in result["windows"] for block in window["blocks"]}
     decided = set(result["reconciled"]["roles"].keys())
-    referenced = {
-        str(item.get("block_ref"))
-        for candidate in result["candidates"]["candidates"]
-        for item in candidate["statement_refs"] + candidate["solution_refs"]
-    } | {
-        str(ref)
-        for candidate in result["candidates"]["candidates"]
-        for ref in candidate["shared_refs"]
-    }
-    excluded = {
-        str(item.get("block_ref")) for item in result["candidates"].get("excluded") or []
-    }
-    diagnostics = " ".join(result["candidates"].get("diagnostics") or [])
-    silent_loss = [
-        ref
-        for ref in block_refs - referenced - excluded
-        if f":{ref}" not in diagnostics
-    ]
+    coverage = assembler.audit_block_coverage(document.get("blocks") or [], result["candidates"])
+    silent_loss = coverage["silent_loss_refs"]
     gates = {
         "coverage_complete": in_windows == block_refs,
         "schema_all_valid": True,  # predict_with_retry 已在适配层校验，非法响应会重试/抛错
         "assembler_no_silent_loss": not silent_loss,
+        "assembler_reference_integrity": not coverage["invalid_references"],
         "overlap_reconcile_ok": isinstance(result["reconciled"].get("has_conflict"), bool),
     }
-    if dump_dir is not None:
-        dump_dir.mkdir(parents=True, exist_ok=True)
-    else:
+    explicit_dump_dir = dump_dir is not None
+    if dump_dir is None:
         import prework_paths
 
         dump_dir = prework_paths.semantic_dir_for(evidence_path)
-        dump_dir.mkdir(parents=True, exist_ok=True)
-        payload = {
-            "schema_version": "md-prework/semantic-run/v1",
-            "document_id": document.get("document_id"),
-            "evidence_hash": document.get("evidence_hash"),
-            "window_size": window_size,
-            "stride": stride,
-            "windows": result["windows"],
-            "predictions": result["predictions"],
-            "reconciled": result["reconciled"],
-            "expansion": result["expansion"],
-            "splits": result["splits"],
-            "candidates": result["candidates"],
-            "prompt_version": prompt_mod.SYSTEM_PROMPT[:60],
-        }
-        # 旧布局下多份文档共用一个目录：文件名带上文档标识，避免互相覆盖
-        dump_name = (
-            "semantic-run.json"
-            if dump_dir.name == "semantic"
-            else f"{evidence_path.name.replace('.evidence.json', '')}.semantic-run.json"
-        )
-        (dump_dir / dump_name).write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-        )
+    dump_dir.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema_version": "md-prework/semantic-run/v1",
+        "document_id": document.get("document_id"),
+        "evidence_hash": document.get("evidence_hash"),
+        "window_size": window_size,
+        "stride": stride,
+        "windows": result["windows"],
+        "predictions": result["predictions"],
+        "reconciled": result["reconciled"],
+        "expansion": result["expansion"],
+        "splits": result["splits"],
+        "candidates": result["candidates"],
+        "assembly_coverage": coverage,
+        "prompt_version": prompt_mod.SYSTEM_PROMPT[:60],
+    }
+    # 显式 dump 可能汇集多份文档；新布局的 evidence.json 必须使用所属文档名。
+    stem = (
+        evidence_path.parent.name.removesuffix("_prework")
+        if evidence_path.name == "evidence.json"
+        else evidence_path.name.removesuffix(".evidence.json")
+    )
+    dump_name = (
+        "semantic-run.json"
+        if not explicit_dump_dir and evidence_path.name == "evidence.json"
+        else f"{stem}.semantic-run.json"
+    )
+    (dump_dir / dump_name).write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
     return {
         "document_id": document.get("document_id"),
         "blocks": len(document.get("blocks") or []),
@@ -197,6 +181,7 @@ def run_document(
         "candidates": result["candidates"].get("candidate_count"),
         "candidate_diagnostics": len(result["candidates"].get("diagnostics") or []),
         "silent_loss": len(silent_loss),
+        "assembly_coverage": coverage,
         "gates": gates,
     }
 
@@ -210,6 +195,7 @@ def aggregate(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "coverage_complete": all(row["gates"]["coverage_complete"] for row in rows),
         "schema_all_valid": all(row["gates"]["schema_all_valid"] for row in rows),
         "assembler_no_silent_loss": all(row["gates"]["assembler_no_silent_loss"] for row in rows),
+        "assembler_reference_integrity": all(row["gates"]["assembler_reference_integrity"] for row in rows),
         "overlap_reconcile_ok": all(row["gates"]["overlap_reconcile_ok"] for row in rows),
     }
     return {
@@ -223,6 +209,7 @@ def aggregate(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "expansion_reasons": dict(sorted(reasons.items(), key=lambda item: -item[1])),
         "candidates": sum(int(row.get("candidates") or 0) for row in rows),
         "candidate_diagnostics": sum(int(row.get("candidate_diagnostics") or 0) for row in rows),
+        "silent_loss": sum(int(row.get("silent_loss") or 0) for row in rows),
         "documents_detail": [dict(row) for row in rows],
     }
 
@@ -299,7 +286,7 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     rows = []
-    jobs = max(1, int(getattr(args, 'jobs', 1)))
+    jobs = max(1, int(getattr(args, "jobs", 1)))
     if jobs > 1:
         with ThreadPoolExecutor(max_workers=jobs) as pool:
             rows = list(pool.map(_run_one, evidence_paths))

@@ -409,3 +409,15 @@ $normPy = Join-Path $norm ".venv\Scripts\python.exe"  # 用 -m 调用最稳
 行内公式补 `\displaystyle`，并**原样保留** OCR 的宽松公式形态。若 `$` 不配对会报退出码 2 ——
 按设计它不猜公式边界。
 
+## 语义组装离线回归与历史重放
+
+语义组装器为尾部共享材料、孤立解析与无法应用的 SPLIT 保留完整块 ID 和诊断；质量门精确核查引用区间，不用块 ID 的子串匹配判断覆盖。
+
+已有 Evidence 与语义快照可完全离线重放，报告会列出原候选、固定旧切分的重组装和当前切分汇总的覆盖差异，不调用 OCR 或 LLM，也不覆盖原产物：
+
+```powershell
+python tools/replay_semantic_assembly.py --evidence-dir "<证据目录>" --output "<新的审计报告.json>"
+```
+
+详见[2026-10-23 修复与审计报告](docs/semantic-assembly-audit-20261023.md)，其中包括回归结果、历史 15 块的核查边界及待人工处理的诊断。
+
